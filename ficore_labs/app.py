@@ -492,7 +492,7 @@ def create_app():
 
         # Redirect onrender.com to custom domain
         if host.endswith("onrender.com"):
-            new_url = request.url.replace("onrender.com", "business.ficoreafrica.com")
+            new_url = request.url.replace("onrender.com", "ficore-labs-records.onrender.com")
             return redirect(new_url, code=301)
 
         # Redirect www to root domain
@@ -500,9 +500,9 @@ def create_app():
             new_url = request.url.replace("www.", "", 1)
             return redirect(new_url, code=301)
 
-        # Redirect ficoreafrica.com to business.ficoreafrica.com
+        # Redirect ficoreafrica.com to ficore-labs-records.onrender.com
         if host == 'ficoreafrica.com':
-            new_url = request.url.replace('ficoreafrica.com', 'business.ficoreafrica.com')
+            new_url = request.url.replace('ficoreafrica.com', 'ficore-labs-records.onrender.com')
             return redirect(new_url, code=301)
 
     app.jinja_env.globals.update(
