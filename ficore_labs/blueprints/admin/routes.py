@@ -1100,6 +1100,38 @@ def contact_waitlist_entry(entry_id):
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return redirect(url_for('admin.view_waitlist'))
 
+# Tax Configuration Management Routes
+@admin_bp.route('/tax/config', methods=['GET'])
+@login_required
+@utils.requires_role('admin')
+@utils.limiter.limit("30 per hour")
+def tax_config():
+    """Tax configuration management dashboard."""
+    try:
+        from admin_tax_config import get_tax_rates, get_tax_bands, get_tax_exemptions
+        
+        current_year = datetime.now().year
+        
+        # Get current tax configurations
+        tax_rates = get_tax_rates(current_year)
+        tax_bands = get_tax_bands(current_year)
+        tax_exemptions = get_tax_exemptions(current_year)
+        
+        logger.info(f"Admin {current_user.id} accessed tax configuration",
+                    extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        
+        return render_template('admin/tax_config.html',
+                             tax_rates=tax_rates,
+                             tax_bands=tax_bands,
+                             tax_exemptions=tax_exemptions,
+                             current_year=current_year,
+                             title=trans('admin_tax_config', default='Tax Configuration'))
+    
+    except Exception as e:
+        logger.error(f"Error loading tax configuration for admin {current_user.id}: {str(e)}",
+                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        flash(trans('admin_tax_config_error', default='An error occurred while loading tax configuration'), 'danger')
+        return render_template('error/500.html'), 500
 
 @admin_bp.route('/tax/rates', methods=['GET', 'POST'])
 @login_required
@@ -1243,51 +1275,7 @@ def manage_tax_exemptions():
         flash(trans('admin_tax_exemptions_error', default='An error occurred while managing tax exemptions'), 'danger')
         return render_template('error/500.html'), 500
 
-@admin_bp.route('/system/settings', methods=['GET', 'POST'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("20 per hour")
-def system_settings():
-    """System settings management."""
-    try:
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        
-        if request.method == 'POST':
-            # Handle system settings updates
-            settings_data = {
-                'maintenance_mode': request.form.get('maintenance_mode') == 'on',
-                'registration_enabled': request.form.get('registration_enabled') == 'on',
-                'trial_duration_days': int(request.form.get('trial_duration_days', 30)),
-                'max_users_per_trial': int(request.form.get('max_users_per_trial', 1000)),
-                'updated_by': current_user.id,
-                'updated_at': datetime.now(timezone.utc)
-            }
-            
-            # Update system settings
-            db.system_config.update_one(
-                {'_id': 'app_settings'},
-                {'$set': settings_data, '$setOnInsert': {'created_at': datetime.now(timezone.utc)}},
-                upsert=True
-            )
-            
-            log_audit_action('update_system_settings', settings_data)
-            flash(trans('admin_system_settings_saved', default='System settings saved successfully'), 'success')
-            return redirect(url_for('admin.system_settings'))
-        
-        # Get current system settings
-        current_settings = db.system_config.find_one({'_id': 'app_settings'}) or {}
-        
-        return render_template('admin/system_settings.html',
-                             settings=current_settings,
-                             title=trans('admin_system_settings', default='System Settings'))
-    
-    except Exception as e:
-        logger.error(f"Error managing system settings for admin {current_user.id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_system_settings_error', default='An error occurred while managing system settings'), 'danger')
-        return render_template('error/500.html'), 500
+
 def contact_signup(entry_id):
     try:
         db = utils.get_mongo_db()
@@ -1433,179 +1421,11 @@ def generate_investor_report_csv(report_data):
         flash(trans('admin_report_error', default='An error occurred while generating the report'), 'danger')
         return render_template('error/500.html'), 500
 
-@admin_bp.route('/tax/config', methods=['GET'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("50 per hour")
-def tax_config():
-    """Tax configuration management dashboard."""
-    try:
-        from admin_tax_config import get_tax_rates, get_tax_bands, get_tax_exemptions
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        current_year = datetime.now().year
-        tax_rates = get_tax_rates(current_year)
-        tax_bands = get_tax_bands(current_year)
-        tax_exemptions = get_tax_exemptions(current_year)
-        stats = {
-            'tax_rates': len(tax_rates),
-            'tax_bands': len(tax_bands),
-            'tax_exemptions': len(tax_exemptions),
-            'current_year': current_year
-        }
-        logger.info(f"Admin {current_user.id} accessed tax configuration",
-                    extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        return render_template('admin/tax_config.html',
-                              stats=stats,
-                              tax_rates=tax_rates,
-                              tax_bands=tax_bands,
-                              tax_exemptions=tax_exemptions,
-                              title=trans('admin_tax_config_title', default='Tax Configuration Management'))
-    except Exception as e:
-        logger.error(f"Error loading tax configuration for admin {current_user.id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-        return render_template('error/500.html'), 500
-        
-@admin_bp.route('/tax/rates', methods=['GET', 'POST'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("50 per hour")
-def manage_tax_rates():
-    """Manage tax rates configuration."""
-    try:
-        from admin_tax_config import TaxRateForm, get_tax_rates, save_tax_rate
-        
-        form = TaxRateForm()
-        
-        if request.method == 'POST' and form.validate_on_submit():
-            success = save_tax_rate(
-                form.entity_type.data,
-                form.tax_year.data,
-                form.rate_percentage.data,
-                form.description.data,
-                current_user.id
-            )
-            
-            if success:
-                flash(trans('admin_tax_rate_saved', default='Tax rate saved successfully'), 'success')
-                log_audit_action('save_tax_rate', {
-                    'entity_type': form.entity_type.data,
-                    'tax_year': form.tax_year.data,
-                    'rate_percentage': form.rate_percentage.data
-                })
-            else:
-                flash(trans('admin_tax_rate_error', default='Error saving tax rate'), 'danger')
-            
-            return redirect(url_for('admin.manage_tax_rates'))
-        
-        # Get all tax rates
-        tax_rates = get_tax_rates()
-        
-        return render_template('admin/tax_rates.html',
-                             form=form,
-                             tax_rates=tax_rates,
-                             title=trans('admin_manage_tax_rates_title', default='Manage Tax Rates'))
-    except Exception as e:
-        logger.error(f"Error in manage_tax_rates for admin {current_user.id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-        return render_template('error/500.html'), 500
 
-@admin_bp.route('/tax/bands', methods=['GET', 'POST'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("50 per hour")
-def manage_tax_bands():
-    """Manage progressive tax bands configuration."""
-    try:
-        from admin_tax_config import TaxBandForm, get_tax_bands, save_tax_band
-        
-        form = TaxBandForm()
-        
-        if request.method == 'POST' and form.validate_on_submit():
-            success = save_tax_band(
-                form.tax_year.data,
-                form.band_min.data,
-                form.band_max.data,
-                form.rate_percentage.data,
-                form.description.data,
-                current_user.id
-            )
-            
-            if success:
-                flash(trans('admin_tax_band_saved', default='Tax band saved successfully'), 'success')
-                log_audit_action('save_tax_band', {
-                    'tax_year': form.tax_year.data,
-                    'band_min': form.band_min.data,
-                    'band_max': form.band_max.data,
-                    'rate_percentage': form.rate_percentage.data
-                })
-            else:
-                flash(trans('admin_tax_band_error', default='Error saving tax band'), 'danger')
-            
-            return redirect(url_for('admin.manage_tax_bands'))
-        
-        # Get all tax bands
-        tax_bands = get_tax_bands()
-        
-        return render_template('admin/tax_bands.html',
-                             form=form,
-                             tax_bands=tax_bands,
-                             title=trans('admin_manage_tax_bands_title', default='Manage Tax Bands'))
-    except Exception as e:
-        logger.error(f"Error in manage_tax_bands for admin {current_user.id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-        return render_template('error/500.html'), 500
 
-@admin_bp.route('/tax/exemptions', methods=['GET', 'POST'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("50 per hour")
-def manage_tax_exemptions():
-    """Manage tax exemptions configuration."""
-    try:
-        from admin_tax_config import TaxExemptionForm, get_tax_exemptions, save_tax_exemption
-        
-        form = TaxExemptionForm()
-        
-        if request.method == 'POST' and form.validate_on_submit():
-            success = save_tax_exemption(
-                form.entity_type.data,
-                form.tax_year.data,
-                form.exemption_threshold.data,
-                form.exemption_type.data,
-                form.description.data,
-                current_user.id
-            )
-            
-            if success:
-                flash(trans('admin_tax_exemption_saved', default='Tax exemption saved successfully'), 'success')
-                log_audit_action('save_tax_exemption', {
-                    'entity_type': form.entity_type.data,
-                    'tax_year': form.tax_year.data,
-                    'exemption_threshold': form.exemption_threshold.data,
-                    'exemption_type': form.exemption_type.data
-                })
-            else:
-                flash(trans('admin_tax_exemption_error', default='Error saving tax exemption'), 'danger')
-            
-            return redirect(url_for('admin.manage_tax_exemptions'))
-        
-        # Get all tax exemptions
-        tax_exemptions = get_tax_exemptions()
-        
-        return render_template('admin/tax_exemptions.html',
-                             form=form,
-                             tax_exemptions=tax_exemptions,
-                             title=trans('admin_manage_tax_exemptions_title', default='Manage Tax Exemptions'))
-    except Exception as e:
-        logger.error(f"Error in manage_tax_exemptions for admin {current_user.id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-        return render_template('error/500.html'), 500
+
+
+
 
 # System Settings Management
 @admin_bp.route('/system/settings', methods=['GET', 'POST'])
@@ -1916,54 +1736,7 @@ def enhanced_analytics_dashboard():
         flash(trans('admin_analytics_error', default='Error loading analytics dashboard'), 'danger')
         return redirect(url_for('admin.dashboard'))
 
-@admin_bp.route('/system/settings', methods=['GET', 'POST'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("20 per hour")
-def system_settings():
-    """System settings management"""
-    try:
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        
-        form = SystemSettingsForm()
-        current_settings = get_system_settings()
-        
-        if request.method == 'POST' and form.validate_on_submit():
-            settings_data = {
-                'app_name': form.app_name.data,
-                'maintenance_mode': form.maintenance_mode.data,
-                'max_trial_days': form.max_trial_days.data,
-                'monthly_subscription_price': form.monthly_subscription_price.data,
-                'yearly_subscription_price': form.yearly_subscription_price.data
-            }
-            
-            if save_system_settings(settings_data, current_user.id):
-                flash(trans('admin_settings_saved', default='System settings saved successfully'), 'success')
-                logger.info(f"Admin {current_user.id} updated system settings")
-                return redirect(url_for('admin.system_settings'))
-            else:
-                flash(trans('admin_settings_error', default='Error saving system settings'), 'danger')
-        
-        # Pre-populate form with current settings
-        if current_settings and request.method == 'GET':
-            form.app_name.data = current_settings.get('app_name', 'Ficore Africa')
-            form.maintenance_mode.data = current_settings.get('maintenance_mode', False)
-            form.max_trial_days.data = current_settings.get('max_trial_days', 30)
-            form.monthly_subscription_price.data = current_settings.get('monthly_subscription_price', 1000.0)
-            form.yearly_subscription_price.data = current_settings.get('yearly_subscription_price', 10000.0)
-        
-        return render_template(
-            'admin/system_settings.html',
-            form=form,
-            current_settings=current_settings,
-            title=trans('admin_system_settings', default='System Settings')
-        )
-    except Exception as e:
-        logger.error(f"Error in system settings for admin {current_user.id}: {str(e)}")
-        flash(trans('admin_database_error', default='Database error occurred'), 'danger')
-        return redirect(url_for('admin.dashboard'))
+
 
 @admin_bp.route('/education/management', methods=['GET', 'POST'])
 @login_required
@@ -2011,96 +1784,9 @@ def education_management():
         flash(trans('admin_database_error', default='Database error occurred'), 'danger')
         return redirect(url_for('admin.dashboard'))
 
-@admin_bp.route('/bulk/operations', methods=['GET', 'POST'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("10 per hour")
-def bulk_operations():
-    """Bulk user operations"""
-    try:
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        
-        form = BulkUserOperationForm()
-        operation_result = None
-        
-        if request.method == 'POST' and form.validate_on_submit():
-            operation_type = form.operation_type.data
-            user_filter = form.user_filter.data
-            operation_value = form.operation_value.data or ''
-            
-            operation_result = execute_bulk_operation(
-                operation_type, user_filter, operation_value, current_user.id
-            )
-            
-            if operation_result['success']:
-                flash(operation_result['message'], 'success')
-                logger.info(f"Admin {current_user.id} executed bulk operation: {operation_type}")
-            else:
-                flash(operation_result['message'], 'danger')
-        
-        from datetime import timedelta
-        user_counts = {
-            'all': db.users.count_documents({}),
-            'trial_users': db.users.count_documents({'is_trial': True}),
-            'subscribed_users': db.users.count_documents({'is_subscribed': True}),
-            'expired_users': db.users.count_documents({
-                '$or': [
-                    {'is_trial': True, 'trial_end': {'$lt': datetime.now(timezone.utc)}},
-                    {'is_subscribed': True, 'subscription_end': {'$lt': datetime.now(timezone.utc)}}
-                ]
-            }),
-            'new_users': db.users.count_documents({
-                'created_at': {'$gte': datetime.now(timezone.utc) - timedelta(days=30)}
-            })
-        }
-        
-        return render_template(
-            'admin/bulk_operations.html',
-            form=form,
-            operation_result=operation_result,
-            user_counts=user_counts,
-            title=trans('admin_bulk_operations', default='Bulk User Operations')
-        )
-    except Exception as e:
-        logger.error(f"Error in bulk operations for admin {current_user.id}: {str(e)}")
-        flash(trans('admin_database_error', default='Database error occurred'), 'danger')
-        return redirect(url_for('admin.dashboard'))
 
-@admin_bp.route('/language/toggle/<user_id>/<language>', methods=['POST'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("5 per hour")
-def toggle_user_language(user_id, language):
-    """Toggle user language preference"""
-    try:
-        from bson import ObjectId
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        
-        if language not in ['en', 'ha']:
-            flash(trans('admin_invalid_language', default='Invalid language selected'), 'danger')
-            return redirect(url_for('admin.manage_users'))
-        
-        result = db.users.update_one(
-            {'_id': ObjectId(user_id)},
-            {'$set': {'language': language, 'updated_at': datetime.now(timezone.utc)}}
-        )
-        
-        if result.modified_count > 0:
-            log_audit_action('toggle_user_language', {'user_id': user_id, 'new_language': language})
-            flash(trans('admin_language_updated', default=f'User language updated to {language.upper()}'), 'success')
-            logger.info(f"Admin {current_user.id} updated language for user {user_id} to {language}")
-        else:
-            flash(trans('admin_user_not_found', default='User not found'), 'danger')
-        
-        return redirect(url_for('admin.manage_users'))
-    except Exception as e:
-        logger.error(f"Error toggling user language: {str(e)}")
-        flash(trans('admin_database_error', default='Database error occurred'), 'danger')
-        return redirect(url_for('admin.manage_users'))
+
+
 
 @admin_bp.route('/system/health', methods=['GET'])
 @login_required
@@ -2120,4 +1806,3 @@ def system_health_monitor():
         logger.error(f"Error loading system health: {str(e)}")
         flash(trans('admin_health_error', default='Error loading system health data'), 'danger')
         return redirect(url_for('admin.dashboard'))
-
