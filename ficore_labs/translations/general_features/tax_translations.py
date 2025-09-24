@@ -135,6 +135,16 @@ TAX_TRANSLATIONS = {
         'total_expenses_summary': 'Total Expenses:',
         'tax_liability_summary': 'Tax Liability:',
         'effective_tax_rate_summary': 'Effective Tax Rate:',
+        
+        # Additional Tax Keys from Templates
+        'step1_deductible_title': 'Step 1: Main Business Expenses (Tax Deductible)',
+        'step1_description': 'These expenses are used to calculate your Net Business Profit in Step 1 of the tax calculation.',
+        'step2_statutory_title': 'Step 2: Statutory & Legal Contributions',
+        'step2_description': 'These expenses are deducted separately in Step 2 of the tax calculation.',
+        'tax_deductible': 'Tax Deductible',
+        'statutory_legal': 'Statutory & Legal',
+        'personal_non_deductible': 'Personal (Non-Deductible)',
+        'expense_categories_description': 'Enter your business expenses by category. Categories are color-coded to show their tax treatment.',
     },
     'ha': {
         'tax_calculator_title': 'Mai kirga haraji mai wayo',
@@ -272,6 +282,16 @@ TAX_TRANSLATIONS = {
         'total_expenses_summary': 'Jimillar Abubuwan Kashewa:',
         'tax_liability_summary': 'Harajin da za a biya:',
         'effective_tax_rate_summary': 'Adadin Haraji mai Tasiri:',
+        
+        # Additional Tax Keys from Templates (Hausa)
+        'step1_deductible_title': 'Mataki 1: Manyan Abubuwan Kashewa na Kasuwanci (Ana iya Cire Haraji)',
+        'step1_description': 'Ana amfani da waɗannan abubuwan kashewa don kirga Tsabtataccen Ribar Kasuwancinka a Mataki 1 na kirgar haraji.',
+        'step2_statutory_title': 'Mataki 2: Gudummawa ta Dokoki da Shari\'a',
+        'step2_description': 'Ana cire waɗannan abubuwan kashewa daban a Mataki 2 na kirgar haraji.',
+        'tax_deductible': 'Ana iya Cire Haraji',
+        'statutory_legal': 'Dokoki da Shari\'a',
+        'personal_non_deductible': 'Na Kai (Ba za a iya Cire Haraji ba)',
+        'expense_categories_description': 'Shigar da abubuwan kashewa na kasuwancinka bisa ga rukuni. Rukunin suna da launuka don nuna yadda ake bi da su a haraji.',
         'office_admin_desc': 'Kayan ofis, takarda, intanet/data, kudin kayayyaki',
         'marketing_sales_desc': 'Talla, tallace-tallace a kafofin watsa labarai, katunan kasuwanci',
         'statutory_contributions_desc': 'Kudin lissafi, shari\'a, da shawarwari da suka shafi kasuwanci',

@@ -38,7 +38,7 @@ try:
     from .trader.receipts_translations import RECEIPTS_TRANSLATIONS    
     # General Features
     from .general_features.general_translations import GENERAL_TRANSLATIONS
-    from .general_features.admin_translations import ADMIN_TRANSLATIONS
+    from .general_features.admin_translations_clean import ADMIN_TRANSLATIONS
     from .general_features.tax_translations import TAX_TRANSLATIONS
     from .general_features.education_translations import EDUCATION_TRANSLATIONS
     
