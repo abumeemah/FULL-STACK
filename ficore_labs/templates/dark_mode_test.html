@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Dark Mode Test - {{ super() }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dark_mode_test.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="dark-mode-test">
+        Dark Mode Active
+    </div>
+    
+    <h1>Dark Mode Visibility Test</h1>
+    <p class="lead">This page tests all major UI components for proper dark mode visibility and contrast.</

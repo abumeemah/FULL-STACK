@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-graduation-cap mr-2"></i>
+                        {{ trans('education_center', default='Tax Education Center') }}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <h5><i class="fas fa-info-circle mr-2"></i>{{ trans('welcome_education', default='Welcome to Tax Education') }}</h5>
+                                <p class="mb-0">{{ trans('education_intro', default='Learn about Nigerian tax laws and compliance requirements tailored to your specific situation. Select your user type below to get started with personalized learning modules.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-12">
+                            <h4 class="mb-3">{{ trans('select_user_type', default='Select Your User Type') }}</h4>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        {% for user_type_id, user_type in user_types.items() %}
+                        <div class="col-md-6 col-lg-3 mb-4">
+                            <div class="card h-100 user-type-card" style="cursor: pointer;" onclick="window.location.href='{{ url_for('education_bp.user_type_modules', user_type=user_type_id) }}'">
+                                <div class="card-body text-center">
+                                    <div class="mb-3">
+                                        {% if user_type_id == 'employee' %}
+                                            <i class="fas fa-user-tie fa-3x text-primary"></i>
+                                        {% elif user_type_id == 'entrepreneur_unregistered' %}
+                                            <i class="fas fa-lightbulb fa-3x text-warning"></i>
+                                        {% elif user_type_id == 'sole_proprietor' %}
+                                            <i class="fas fa-store fa-3x text-success"></i>
+                                        {% elif user_type_id == 'company' %}
+                                            <i class="fas fa-building fa-3x text-info"></i>
+                                        {% endif %}
+                                    </div>
+                                    <h5 class="card-title">{{ user_type.name }}</h5>
+                                    <p class="card-text text-muted">{{ user_type.description }}</p>
+                                    <div class="mt-auto">
+                                        <span class="badge badge-secondary">{{ user_type.modules|length }} {{ trans('modules', default='modules') }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h5><i class="fas fa-question-circle mr-2"></i>{{ trans('not_sure', default='Not Sure Which Category You Fit?') }}</h5>
+                                    <p class="mb-3">{{ trans('category_help', default='Here\'s a quick guide to help you choose:') }}</p>
+                                    <ul class="list-unstyled">
+                                        <li><strong>{{ trans('employee_guide', default='Employee:') }}</strong> {{ trans('employee_guide_desc', default='You receive a monthly salary and your employer deducts tax from your pay') }}</li>
+                                        <li><strong>{{ trans('entrepreneur_guide', default='Entrepreneur (Unregistered):') }}</strong> {{ trans('entrepreneur_guide_desc', default='You run a business but haven\'t registered it with CAC') }}</li>
+                                        <li><strong>{{ trans('sole_proprietor_guide', default='Sole Proprietor:') }}</strong> {{ trans('sole_proprietor_guide_desc', default='You have a registered business name but not a limited company') }}</li>
+                                        <li><strong>{{ trans('company_guide', default='Company:') }}</strong> {{ trans('company_guide_desc', default='You have a registered limited liability company (Ltd/PLC)') }}</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <div class="card border-primary">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-book fa-2x text-primary mb-3"></i>
+                                    <h5>{{ trans('browse_all_modules', default='Browse All Modules') }}</h5>
+                                    <p class="text-muted">{{ trans('browse_modules_desc', default='Explore all available education modules') }}</p>
+                                    <a href="{{ url_for('education_bp.user_type_modules', user_type='employee') }}" class="btn btn-outline-primary">{{ trans('view_all', default='View All') }}</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-success">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-search fa-2x text-success mb-3"></i>
+                                    <h5>{{ trans('search_topics', default='Search Topics') }}</h5>
+                                    <p class="text-muted">{{ trans('search_desc', default='Find specific tax topics and information') }}</p>
+                                    <a href="{{ url_for('education_bp.search') }}" class="btn btn-outline-success">{{ trans('search_now', default='Search Now') }}</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.user-type-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.user-type-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+</style>
+{% endblock %}

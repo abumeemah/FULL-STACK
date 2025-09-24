@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h3 class="card-title">
+                            <i class="fas fa-search mr-2"></i>
+                            {{ trans('search_education', default='Search Education') }}
+                        </h3>
+                        <a href="{{ url_for('education_bp.education_home') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left mr-1"></i>{{ trans('back_to_education', default='Back to Education') }}
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <form method="GET" action="{{ url_for('education_bp.search') }}">
+                                <div class="input-group input-group-lg">
+                                    <input type="text" class="form-control" name="q" value="{{ query }}" placeholder="{{ trans('search_placeholder', default='Search for tax topics, terms, or concepts...') }}" autofocus>
+                                    <div class="input-group-append">
+                                        <button class="btn btn-primary" type="submit">
+                                            <i class="fas fa-search mr-2"></i>{{ trans('search', default='Search') }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    {% if query %}
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <h5>{{ trans('search_results_for', default='Search Results for') }} "{{ query }}"</h5>
+                            <p class="text-muted">{{ results|length }} {{ trans('results_found', default='results found') }}</p>
+                        </div>
+                    </div>
+
+                    {% if results %}
+                    <div class="row">
+                        <div class="col-12">
+                            {% for result in results %}
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="card-title">
+                                                <a href="{{ result.url }}" class="text-decoration-none">{{ result.title }}</a>
+                                                <span class="badge badge-secondary ml-2">{{ result.type }}</span>
+                                            </h6>
+                                            <p class="card-text text-muted">{{ result.description }}</p>
+                                        </div>
+                                        <div class="ml-3">
+                                            {% if result.type == 'module' %}
+                                                <i class="fas fa-book fa-2x text-primary"></i>
+                                            {% elif result.type == 'section' %}
+                                                <i class="fas fa-file-alt fa-2x text-success"></i>
+                                            {% elif result.type == 'glossary' %}
+                                                <i class="fas fa-bookmark fa-2x text-info"></i>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="alert alert-warning">
+                                <h5><i class="fas fa-exclamation-triangle mr-2"></i>{{ trans('no_results', default='No Results Found') }}</h5>
+                                <p class="mb-3">{{ trans('no_results_message', default='We couldn\'t find any content matching your search. Try:') }}</p>
+                                <ul class="mb-0">
+                                    <li>{{ trans('search_tip1', default='Using different keywords') }}</li>
+                                    <li>{{ trans('search_tip2', default='Checking your spelling') }}</li>
+                                    <li>{{ trans('search_tip3', default='Using more general terms') }}</li>
+                                    <li>{{ trans('search_tip4', default='Browsing our education modules directly') }}</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <h5><i class="fas fa-info-circle mr-2"></i>{{ trans('search_help', default='Search Help') }}</h5>
+                                <p class="mb-3">{{ trans('search_help_text', default='Use the search box above to find specific tax topics, terms, or concepts. You can search through:') }}</p>
+                                <ul class="mb-3">
+                                    <li>{{ trans('search_modules', default='Education modules and their content') }}</li>
+                                    <li>{{ trans('search_glossary', default='Tax glossary terms and definitions') }}</li>
+                                    <li>{{ trans('search_sections', default='Specific sections within modules') }}</li>
+                                </ul>
+                                <p class="mb-0">{{ trans('search_examples', default='Try searching for terms like "PIT", "deductions", "filing", or "TIN registration".') }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-12">
+                            <h5 class="mb-3">{{ trans('popular_topics', default='Popular Topics') }}</h5>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <div class="card border-primary">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-balance-scale fa-2x text-primary mb-2"></i>
+                                    <h6>{{ trans('tax_types', default='Tax Types') }}</h6>
+                                    <a href="{{ url_for('education_bp.search', q='tax types') }}" class="btn btn-outline-primary btn-sm">{{ trans('learn_more', default='Learn More') }}</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <div class="card border-success">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-percentage fa-2x text-success mb-2"></i>
+                                    <h6>{{ trans('deductions', default='Deductions') }}</h6>
+                                    <a href="{{ url_for('education_bp.search', q='deductions') }}" class="btn btn-outline-success btn-sm">{{ trans('learn_more', default='Learn More') }}</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <div class="card border-info">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-file-upload fa-2x text-info mb-2"></i>
+                                    <h6>{{ trans('filing', default='Filing') }}</h6>
+                                    <a href="{{ url_for('education_bp.search', q='filing') }}" class="btn btn-outline-info btn-sm">{{ trans('learn_more', default='Learn More') }}</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 mb-3">
+                            <div class="card border-warning">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-id-card fa-2x text-warning mb-2"></i>
+                                    <h6>{{ trans('tin_registration', default='TIN Registration') }}</h6>
+                                    <a href="{{ url_for('education_bp.search', q='TIN registration') }}" class="btn btn-outline-warning btn-sm">{{ trans('learn_more', default='Learn More') }}</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

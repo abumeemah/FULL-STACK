@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h3 class="card-title">
+                            <i class="fas fa-book-open mr-2"></i>
+                            {{ module.title }}
+                        </h3>
+                        <div>
+                            <button onclick="history.back()" class="btn btn-outline-secondary mr-2">
+                                <i class="fas fa-arrow-left mr-1"></i>{{ trans('back', default='Back') }}
+                            </button>
+                            <button onclick="markAsComplete()" class="btn btn-success">
+                                <i class="fas fa-check mr-1"></i>{{ trans('mark_complete', default='Mark Complete') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <p class="mb-0">{{ module.description }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% for section_id, section in module.content.items() %}
+                    <div class="row mb-4" id="{{ section_id }}">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <h4 class="mb-0">{{ section.title }}</h4>
+                                </div>
+                                <div class="card-body">
+                                    <p class="lead">{{ section.content }}</p>
+                                    
+                                    {% if section.key_points %}
+                                    <h6 class="mt-4 mb-3">{{ trans('key_points', default='Key Points:') }}</h6>
+                                    <ul class="list-group list-group-flush">
+                                        {% for point in section.key_points %}
+                                        <li class="list-group-item d-flex align-items-center">
+                                            <i class="fas fa-check-circle text-success mr-3"></i>
+                                            {{ point }}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                    {% endif %}
+
+                                    {% if section.action_url and section.action_text %}
+                                    <div class="mt-4">
+                                        <a href="{{ section.action_url }}" target="_blank" class="btn btn-primary">
+                                            <i class="fas fa-external-link-alt mr-2"></i>{{ section.action_text }}
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    <div class="row mt-5">
+                        <div class="col-12">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h5><i class="fas fa-lightbulb mr-2"></i>{{ trans('practical_tip', default='Practical Tip') }}</h5>
+                                    <p class="mb-3">{{ trans('module_tip_' + module_id, default='Use Ficore\'s expense tracking features to automatically categorize your business expenses and simplify tax compliance.') }}</p>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <a href="{{ url_for('tax_bp.tax_calculator') }}" class="btn btn-outline-success btn-block">
+                                                <i class="fas fa-calculator mr-2"></i>{{ trans('try_tax_calculator', default='Try Tax Calculator') }}
+                                            </a>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <a href="{{ url_for('education_bp.glossary') }}" class="btn btn-outline-info btn-block">
+                                                <i class="fas fa-book mr-2"></i>{{ trans('view_glossary', default='View Glossary') }}
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-12 text-center">
+                            <button onclick="markAsComplete()" class="btn btn-success btn-lg">
+                                <i class="fas fa-graduation-cap mr-2"></i>{{ trans('complete_module', default='Complete This Module') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function markAsComplete() {
+    fetch('{{ url_for("education_bp.track_completion") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+            module_id: '{{ module_id }}'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show';
+            alert.innerHTML = `
+                <i class="fas fa-check-circle mr-2"></i>{{ trans('module_completed', default='Module completed successfully!') }}
+                <button type="button" class="close" data-dismiss="alert">
+                    <span>&times;</span>
+                </button>
+            `;
+            document.querySelector('.card-body').insertBefore(alert, document.querySelector('.card-body').firstChild);
+            
+            // Auto-dismiss after 3 seconds
+            setTimeout(() => {
+                alert.remove();
+            }, 3000);
+        } else {
+            console.error('Error marking module as complete:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h3 class="card-title">
+                            <i class="fas fa-book mr-2"></i>
+                            {{ trans('tax_glossary', default='Tax Glossary') }}
+                        </h3>
+                        <a href="{{ url_for('education_bp.education_home') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left mr-1"></i>{{ trans('back_to_education', default='Back to Education') }}
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <p class="mb-0">{{ trans('glossary_intro', default='Understanding tax terminology is crucial for compliance. Here are key terms you\'ll encounter in Nigerian tax law.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                </div>
+                                <input type="text" class="form-control" id="glossarySearch" placeholder="{{ trans('search_glossary', default='Search glossary terms...') }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="accordion" id="glossaryAccordion">
+                                {% for term_id, term in glossary.items() %}
+                                <div class="card glossary-item" id="{{ term_id }}">
+                                    <div class="card-header" id="heading{{ loop.index }}">
+                                        <h5 class="mb-0">
+                                            <button class="btn btn-link text-left" type="button" data-toggle="collapse" data-target="#collapse{{ loop.index }}" aria-expanded="false" aria-controls="collapse{{ loop.index }}">
+                                                <i class="fas fa-chevron-right mr-2 collapse-icon"></i>
+                                                <strong>{{ term.term }}</strong>
+                                            </button>
+                                        </h5>
+                                    </div>
+                                    <div id="collapse{{ loop.index }}" class="collapse" aria-labelledby="heading{{ loop.index }}" data-parent="#glossaryAccordion">
+                                        <div class="card-body">
+                                            <p class="mb-0">{{ term.definition }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h5><i class="fas fa-question-circle mr-2"></i>{{ trans('need_more_help', default='Need More Help?') }}</h5>
+                                    <p class="mb-3">{{ trans('glossary_help_text', default='If you can\'t find a term you\'re looking for, or need more detailed explanations, here are some resources:') }}</p>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <a href="https://www.firs.gov.ng" target="_blank" class="btn btn-outline-primary btn-block">
+                                                <i class="fas fa-external-link-alt mr-2"></i>{{ trans('firs_website', default='FIRS Website') }}
+                                            </a>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <a href="{{ url_for('education_bp.search') }}" class="btn btn-outline-success btn-block">
+                                                <i class="fas fa-search mr-2"></i>{{ trans('search_education', default='Search Education') }}
+                                            </a>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <a href="{{ url_for('tax_bp.tax_calculator') }}" class="btn btn-outline-info btn-block">
+                                                <i class="fas fa-calculator mr-2"></i>{{ trans('tax_calculator', default='Tax Calculator') }}
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('glossarySearch');
+    const glossaryItems = document.querySelectorAll('.glossary-item');
+
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        
+        glossaryItems.forEach(function(item) {
+            const term = item.querySelector('strong').textContent.toLowerCase();
+            const definition = item.querySelector('.card-body p').textContent.toLowerCase();
+            
+            if (term.includes(searchTerm) || definition.includes(searchTerm)) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+
+    // Handle collapse icon rotation
+    document.querySelectorAll('[data-toggle="collapse"]').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const icon = this.querySelector('.collapse-icon');
+            const target = document.querySelector(this.getAttribute('data-target'));
+            
+            target.addEventListener('shown.bs.collapse', function() {
+                icon.classList.remove('fa-chevron-right');
+                icon.classList.add('fa-chevron-down');
+            });
+            
+            target.addEventListener('hidden.bs.collapse', function() {
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-right');
+            });
+        });
+    });
+});
+</script>
+
+<style>
+.collapse-icon {
+    transition: transform 0.2s;
+}
+
+.glossary-item {
+    margin-bottom: 0.5rem;
+}
+
+.btn-link {
+    text-decoration: none;
+    width: 100%;
+}
+
+.btn-link:hover {
+    text-decoration: none;
+}
+</style>
+{% endblock %}

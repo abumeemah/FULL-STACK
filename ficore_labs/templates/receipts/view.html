@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">{{ t('receipts_view_title', default='Receipt Details') | e }}</h2>
+                    <p class="text-muted mb-0">{{ t('receipts_view_subtitle', default='Detailed view of your sale record') | e }}</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('receipts.generate_pdf', id=receipt._id) }}" class="btn btn-outline-primary">
+                        <i class="bi bi-file-pdf me-1"></i>
+                        {{ t('general_download_pdf', default='Download PDF') | e }}
+                    </a>
+                    <a href="{{ url_for('receipts.edit', id=receipt._id) }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-pencil me-1"></i>
+                        {{ t('general_edit', default='Edit') | e }}
+                    </a>
+                    <a href="{{ url_for('receipts.index') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left me-1"></i>
+                        {{ t('general_back', default='Back') | e }}
+                    </a>
+                </div>
+            </div>
+
+            <!-- Receipt Card -->
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-primary text-white">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-receipt me-2"></i>
+                                    {{ t('receipts_title', default='Sale Receipt') | e }}
+                                </h5>
+                                <span class="badge bg-light text-dark">
+                                    #{{ receipt._id|string|truncate(8, True, '...') }}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="card-body p-4">
+                            <!-- Business Header -->
+                            <div class="text-center mb-4 pb-3 border-bottom">
+                                <h4 class="text-primary mb-1">{{ current_user.business_name or 'FiCore Business' }}</h4>
+                                <p class="text-muted mb-0">{{ t('receipts_official_receipt', default='Official Sales Receipt') | e }}</p>
+                            </div>
+
+                            <!-- Receipt Details -->
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small">{{ t('receipts_party_name', default='Customer Name') | e }}</label>
+                                        <div class="fw-bold">{{ receipt.party_name }}</div>
+                                    </div>
+                                    
+                                    {% if receipt.contact %}
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small">{{ t('general_contact', default='Contact') | e }}</label>
+                                        <div>{{ receipt.contact }}</div>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small">{{ t('general_payment_method', default='Payment Method') | e }}</label>
+                                        <div class="text-capitalize">
+                                            <i class="bi bi-{{ 'cash' if receipt.method == 'cash' else 'credit-card' if receipt.method == 'card' else 'bank' }} me-1"></i>
+                                            {{ receipt.method or 'Cash' }}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small">{{ t('general_date', default='Date') | e }}</label>
+                                        <div>{{ format_date(receipt.created_at) }}</div>
+                                    </div>
+                                    
+                                    {% if receipt.category %}
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small">{{ t('general_category', default='Category') | e }}</label>
+                                        <div>
+                                            <span class="badge bg-secondary">{{ receipt.category }}</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if receipt.voice_logged %}
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small">{{ t('general_entry_method', default='Entry Method') | e }}</label>
+                                        <div>
+                                            <span class="badge bg-info">
+                                                <i class="bi bi-mic-fill me-1"></i>
+                                                {{ t('voice_logged', default='Voice Logged') | e }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Amount Section -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <div class="bg-light p-4 rounded">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <label class="form-label text-muted small mb-1">{{ t('general_amount', default='Amount Received') | e }}</label>
+                                                <div class="h3 text-success mb-0">{{ format_currency(receipt.amount) }}</div>
+                                            </div>
+                                            <div class="text-end">
+                                                <i class="bi bi-arrow-down-circle text-success" style="font-size: 2rem;"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Description -->
+                            {% if receipt.description %}
+                            <div class="mb-4">
+                                <label class="form-label text-muted small">{{ t('general_description', default='Description') | e }}</label>
+                                <div class="p-3 bg-light rounded">{{ receipt.description }}</div>
+                            </div>
+                            {% endif %}
+
+                            <!-- Voice Transcription -->
+                            {% if receipt.transcription %}
+                            <div class="mb-4">
+                                <label class="form-label text-muted small">{{ t('voice_transcription', default='Voice Transcription') | e }}</label>
+                                <div class="p-3 bg-info bg-opacity-10 rounded border-start border-info border-3">
+                                    <i class="bi bi-mic me-2 text-info"></i>
+                                    "{{ receipt.transcription }}"
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <!-- Footer -->
+                            <div class="text-center pt-3 border-top">
+                                <small class="text-muted">
+                                    {{ t('receipts_generated_by', default='Generated by') | e }} FiCore Records
+                                    <br>
+                                    {{ t('receipts_receipt_id', default='Receipt ID') | e }}: {{ receipt._id }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="text-center mt-4">
+                        <div class="btn-group" role="group">
+                            <a href="{{ url_for('receipts.edit', id=receipt._id) }}" class="btn btn-outline-primary">
+                                <i class="bi bi-pencil me-1"></i>
+                                {{ t('general_edit', default='Edit') | e }}
+                            </a>
+                            <a href="{{ url_for('receipts.generate_pdf', id=receipt._id) }}" class="btn btn-primary">
+                                <i class="bi bi-file-pdf me-1"></i>
+                                {{ t('general_download_pdf', default='Download PDF') | e }}
+                            </a>
+                            <button type="button" class="btn btn-outline-success" onclick="shareReceipt()">
+                                <i class="bi bi-share me-1"></i>
+                                {{ t('general_share', default='Share') | e }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Share Modal -->
+<div class="modal fade" id="shareModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ t('general_share_receipt', default='Share Receipt') | e }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="shareForm">
+                    <div class="mb-3">
+                        <label class="form-label">{{ t('general_recipient', default='Recipient') | e }}</label>
+                        <input type="text" class="form-control" id="shareRecipient" placeholder="{{ t('general_phone_number', default='Phone number') | e }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ t('general_message', default='Message') | e }}</label>
+                        <textarea class="form-control" id="shareMessage" rows="3" placeholder="{{ t('general_custom_message', default='Add a custom message...') | e }}">{{ t('receipts_share_default_message', default='Here is your receipt from') | e }} {{ current_user.business_name or 'our business' }}.</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ t('general_share_method', default='Share Method') | e }}</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="shareType" id="shareSMS" value="sms" checked>
+                            <label class="btn btn-outline-primary" for="shareSMS">
+                                <i class="bi bi-chat-text me-1"></i>
+                                SMS
+                            </label>
+                            <input type="radio" class="btn-check" name="shareType" id="shareWhatsApp" value="whatsapp">
+                            <label class="btn btn-outline-success" for="shareWhatsApp">
+                                <i class="bi bi-whatsapp me-1"></i>
+                                WhatsApp
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    {{ t('general_cancel', default='Cancel') | e }}
+                </button>
+                <button type="button" class="btn btn-primary" onclick="sendShare()">
+                    <i class="bi bi-send me-1"></i>
+                    {{ t('general_send', default='Send') | e }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function shareReceipt() {
+    const shareModal = new bootstrap.Modal(document.getElementById('shareModal'));
+    shareModal.show();
+}
+
+function sendShare() {
+    const recipient = document.getElementById('shareRecipient').value;
+    const message = document.getElementById('shareMessage').value;
+    const shareType = document.querySelector('input[name="shareType"]:checked').value;
+    
+    if (!recipient) {
+        alert('{{ t("general_please_enter_recipient", default="Please enter a recipient") | e }}');
+        return;
+    }
+    
+    // Create receipt summary
+    const receiptSummary = `${message}\n\n` +
+        `{{ t('receipts_party_name', default='Customer') | e }}: {{ receipt.party_name }}\n` +
+        `{{ t('general_amount', default='Amount') | e }}: {{ format_currency(receipt.amount) }}\n` +
+        `{{ t('general_date', default='Date') | e }}: {{ format_date(receipt.created_at) }}\n` +
+        `{{ t('receipts_receipt_id', default='Receipt ID') | e }}: {{ receipt._id }}\n\n` +
+        `{{ t('receipts_thank_you', default='Thank you for your business!') | e }}`;
+    
+    if (shareType === 'whatsapp') {
+        // WhatsApp sharing
+        const whatsappUrl = `https://wa.me/${recipient.replace(/\D/g, '')}?text=${encodeURIComponent(receiptSummary)}`;
+        window.open(whatsappUrl, '_blank');
+    } else {
+        // SMS sharing
+        const smsUrl = `sms:${recipient}?body=${encodeURIComponent(receiptSummary)}`;
+        window.location.href = smsUrl;
+    }
+    
+    // Close modal
+    const shareModal = bootstrap.Modal.getInstance(document.getElementById('shareModal'));
+    shareModal.hide();
+    
+    // Show success message
+    const toast = document.createElement('div');
+    toast.className = 'toast align-items-center text-white bg-success border-0 position-fixed top-0 end-0 m-3';
+    toast.setAttribute('role', 'alert');
+    toast.style.zIndex = '9999';
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-check-circle me-2"></i>
+                {{ t('general_share_initiated', default='Share initiated successfully!') | e }}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    
+    // Remove toast after it's hidden
+    toast.addEventListener('hidden.bs.toast', () => {
+        document.body.removeChild(toast);
+    });
+}
+
+// Print functionality
+function printReceipt() {
+    window.print();
+}
+
+// Add print styles
+const printStyles = `
+    <style media="print">
+        .btn, .modal, .navbar, .breadcrumb { display: none !important; }
+        .card { border: none !important; box-shadow: none !important; }
+        .card-header { background: #f8f9fa !important; color: #000 !important; }
+        body { font-size: 12pt; }
+        .container-fluid { max-width: 100% !important; }
+    </style>
+`;
+document.head.insertAdjacentHTML('beforeend', printStyles);
+</script>
+
+{% endblock %}

@@ -1,0 +1,1508 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('tax_calculator_title', default='Tax Calculator') | e }} - DIICE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-header">
+                <h1 class="page-title">{{ t('tax_calculator_title', default='Tax Calculator') | e }}</h1>
+                <p class="page-subtitle">{{ t('tax_calculator_subtitle', default='Calculate your tax liability based on Nigeria Tax Act 2025') | e }}</p>
+                
+                <!-- Entity Type Display -->
+                <div class="entity-type-info mt-3">
+                    <div class="alert alert-info d-flex align-items-center">
+                        <i class="fas fa-building me-3"></i>
+                        <div class="flex-grow-1">
+                            <strong>{{ t('business_entity_type', default='Business Entity Type') | e }}:</strong>
+                            <span class="entity-type-name">{{ entity_info.name }}</span>
+                            <br>
+                            <small class="text-muted">
+                                {{ t('tax_type_label', default='Tax Type') | e }}: {{ entity_info.tax_type }}
+                                <br>
+                                {{ entity_info.tax_details }}
+                            </small>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#entityTypeModal">
+                            <i class="fas fa-edit"></i> {{ t('change_entity_type', default='Change') | e }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Input Form -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">{{ t('income_expenses_title', default='Income & Expenses') | e }}</h3>
+                </div>
+                <div class="card-body">
+                    <form id="taxCalculatorForm">
+                        <!-- Annual Income Section -->
+                        <div class="mb-4" role="group" aria-labelledby="income-heading">
+                            <h4 class="mb-3" id="income-heading">{{ t('annual_income_title', default='Annual Income') | e }}</h4>
+                            <div class="form-group">
+                                <label for="total_income" class="form-label">{{ t('income_label', default='Total Annual Income') | e }} (₦)</label>
+                                <input type="number" class="form-control" id="total_income" name="total_income"
+                                    placeholder="{{ t('total_income_placeholder', default='Enter your total annual income') | e }}"
+                                    min="0" step="0.01"
+                                    aria-label="{{ t('income_label', default='Total Annual Income') }}"
+                                    aria-describedby="income-help"
+                                    aria-required="true">
+                                <div id="income-help" class="form-text">
+                                    {{ t('income_help_text', default='Enter your total business income for the tax year') }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Annual Rent Section -->
+                        <div class="mb-4" role="group" aria-labelledby="rent-heading">
+                            <h4 class="mb-3" id="rent-heading">{{ t('annual_rent_title', default='Annual Rent') | e }}</h4>
+                            <div class="form-group">
+                                <label for="annual_rent" class="form-label">{{ t('rent_label', default='Annual Rent Paid') | e }} (₦)</label>
+                                <input type="number" class="form-control" id="annual_rent" name="annual_rent"
+                                    value="{{ user_annual_rent }}"
+                                    placeholder="{{ t('annual_rent_placeholder', default='Enter your annual rent') | e }}"
+                                    min="0" step="0.01"
+                                    aria-label="{{ t('rent_label', default='Annual Rent Paid') }}"
+                                    aria-describedby="rent-help">
+                                <small class="form-text text-muted" id="rent-help">
+                                    <i class="fas fa-info-circle text-info" aria-hidden="true"></i>
+                                    {{ t('rent_relief_info', default='Rent relief is calculated as the lower of ₦500,000 or 20% of your annual rent') | e }}
+                                    <a href="{{ url_for('education_bp.view_module', module_id='deductions_reliefs') }}#rent_relief" 
+                                       target="_blank" class="ml-2" 
+                                       aria-label="{{ t('learn_more', default='Learn more') }} {{ t('general_opens_new_window', default='(opens in new window)') }}">
+                                        <i class="fas fa-graduation-cap" aria-hidden="true"></i> {{ t('learn_more', default='Learn more') }}
+                                    </a>
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Categorized Business Expenses Section -->
+                        <div class="mb-4">
+                            <h4 class="mb-3">{{ t('expense_categories_title', default='Business Expense Categories') | e }}</h4>
+                            <p class="text-muted mb-3">
+                                {{ t('expense_categories_description', default='Enter your business expenses by category. Categories are color-coded to show their tax treatment.') | e }}
+                            </p>
+
+                            <!-- Tax Deductible Categories (Step 1) -->
+                            <div class="expense-group mb-4" role="group" aria-labelledby="step1-heading">
+                                <h5 class="text-success mb-3" id="step1-heading">
+                                    <i class="fas fa-check-circle" aria-hidden="true"></i> {{ t('step1_deductible_title', default='Step 1: Main Business Expenses (Tax Deductible)') | e }}
+                                </h5>
+                                <p class="small text-muted mb-3" id="step1-description">{{ t('step1_description', default='These expenses are used to calculate your Net Business Profit in Step 1 of the tax calculation.') | e }}</p>
+                                
+                                {% for category_key, category in expense_categories.items() %}
+                                {% if category.tax_deductible and not category.is_statutory and not category.is_personal %}
+                                <div class="expense-category mb-3" role="group" aria-labelledby="{{ category_key }}-heading">
+                                    <div class="card border-success">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <h6 class="card-title mb-0" id="{{ category_key }}-heading">{{ category.name }}</h6>
+                                                <span class="badge bg-success" role="status" aria-label="{{ t('tax_deductible_indicator', default='Tax Deductible') }}">
+                                                    <i class="fas fa-check-circle" aria-hidden="true"></i> {{ t('tax_deductible', default='Tax Deductible') | e }}
+                                                </span>
+                                            </div>
+                                            <p class="card-text text-muted small" id="{{ category_key }}-description">{{ category.description }}</p>
+                                            <div class="form-group">
+                                                <label for="{{ category_key }}" class="form-label">{{ t('amount_label', default='Amount (₦)') | e }}</label>
+                                                <input type="number" class="form-control expense-input"
+                                                    id="{{ category_key }}" name="{{ category_key }}"
+                                                    placeholder="{{ t('amount_placeholder', default='0.00') | e }}" min="0"
+                                                    step="0.01" data-category-type="deductible"
+                                                    aria-label="{{ category.name }} {{ t('amount_label', default='Amount') }}"
+                                                    aria-describedby="{{ category_key }}-description {{ category_key }}-examples"
+                                                    title="{{ category.description }}">
+                                            </div>
+                                            <div class="examples" id="{{ category_key }}-examples">
+                                                <small class="text-muted">
+                                                    <strong>{{ t('examples_label', default='Examples:') | e }}</strong> {{ category.examples | join(', ') }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+
+                            <!-- Statutory & Legal Contributions (Step 2) -->
+                            <div class="expense-group mb-4" role="group" aria-labelledby="step2-heading">
+                                <h5 class="text-info mb-3" id="step2-heading">
+                                    <i class="fas fa-gavel" aria-hidden="true"></i> {{ t('step2_statutory_title', default='Step 2: Statutory & Legal Contributions') | e }}
+                                </h5>
+                                <p class="small text-muted mb-3" id="step2-description">{{ t('step2_description', default='These expenses are deducted separately in Step 2 of the tax calculation.') | e }}</p>
+                                
+                                {% for category_key, category in expense_categories.items() %}
+                                {% if category.is_statutory %}
+                                <div class="expense-category mb-3">
+                                    <div class="card border-info">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <h6 class="card-title mb-0">{{ category.name }}</h6>
+                                                <span class="badge bg-info">
+                                    <i class="fas fa-gavel"></i> {{ t('statutory_deduction', default='Statutory Deduction') | e }}
+                                </span>
+                                            </div>
+                                            <p class="card-text text-muted small">{{ category.description }}</p>
+                                            <div class="form-group">
+                                                <label for="{{ category_key }}" class="form-label">{{ t('amount_label', default='Amount (₦)') | e }}</label>
+                                                <input type="number" class="form-control expense-input"
+                                                    id="{{ category_key }}" name="{{ category_key }}"
+                                                    placeholder="{{ t('amount_placeholder', default='0.00') | e }}" min="0"
+                                                    step="0.01" data-category-type="statutory"
+                                                    title="{{ category.description }}">
+                                            </div>
+                                            <div class="examples">
+                                                <small class="text-muted">
+                                                    <strong>{{ t('examples_label', default='Examples:') | e }}</strong> {{ category.examples | join(', ') }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+
+                            <!-- Personal Expenses (Non-deductible) -->
+                            <div class="expense-group mb-4" role="group" aria-labelledby="personal-heading">
+                                <h5 class="text-warning mb-3" id="personal-heading">
+                                    <i class="fas fa-exclamation-triangle" aria-hidden="true"></i> {{ t('personal_expenses_title', default='Personal Expenses (Not Tax Deductible)') | e }}
+                                </h5>
+                                <p class="small text-muted mb-3" id="personal-description">{{ t('personal_expenses_description', default='These expenses are not included in tax calculations but can be tracked for record-keeping.') | e }}</p>
+                                
+                                {% for category_key, category in expense_categories.items() %}
+                                {% if category.is_personal %}
+                                <div class="expense-category mb-3" role="group" aria-labelledby="{{ category_key }}-heading">
+                                    <div class="card border-warning">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <h6 class="card-title mb-0" id="{{ category_key }}-heading">{{ category.name }}</h6>
+                                                <span class="badge bg-warning text-dark" role="status" aria-label="{{ t('non_tax_deductible_indicator', default='Not Tax Deductible') }}">
+                                                    <i class="fas fa-times-circle" aria-hidden="true"></i> {{ t('not_deductible', default='Not Deductible') | e }}
+                                                </span>
+                                            </div>
+                                            <p class="card-text text-muted small" id="{{ category_key }}-description">{{ category.description }}</p>
+                                            <div class="alert alert-warning small" role="alert">
+                                                <i class="fas fa-info-circle" aria-hidden="true"></i> {{ t('personal_expense_warning', default='Personal expenses are not tax deductible') }}
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="{{ category_key }}" class="form-label">{{ t('amount_label', default='Amount (₦)') | e }}</label>
+                                                <input type="number" class="form-control expense-input"
+                                                    id="{{ category_key }}" name="{{ category_key }}"
+                                                    placeholder="{{ t('amount_placeholder', default='0.00') | e }}" min="0"
+                                                    step="0.01" data-category-type="personal"
+                                                    aria-label="{{ category.name }} {{ t('amount_label', default='Amount') }}"
+                                                    aria-describedby="{{ category_key }}-description {{ category_key }}-examples {{ category_key }}-warning"
+                                                    title="{{ category.description }}">
+                                            </div>
+                                            <div class="examples" id="{{ category_key }}-examples">
+                                                <small class="text-muted">
+                                                    <strong>{{ t('examples_label', default='Examples:') | e }}</strong> {{ category.examples | join(', ') }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Help Section -->
+                        <div class="help-section mb-4" role="region" aria-labelledby="help-heading">
+                            <div class="card border-info">
+                                <div class="card-header">
+                                    <h6 class="mb-0" id="help-heading">
+                                        <button class="btn btn-link text-decoration-none p-0" type="button" 
+                                                data-bs-toggle="collapse" data-bs-target="#helpCollapse" 
+                                                aria-expanded="false" aria-controls="helpCollapse"
+                                                aria-label="{{ t('how_it_works', default='How Tax Calculation Works') }} - {{ t('general_click_to_expand', default='Click to expand') }}">
+                                            <i class="fas fa-question-circle text-info" aria-hidden="true"></i> {{ t('how_it_works', default='How Tax Calculation Works') | e }}
+                                            <i class="fas fa-chevron-down ms-2" aria-hidden="true"></i>
+                                        </button>
+                                    </h6>
+                                </div>
+                                <div class="collapse" id="helpCollapse">
+                                    <div class="card-body">
+                                        {% if user_entity_type == 'sole_proprietor' %}
+                                        <p class="small mb-3">{{ t('pit_explanation', default='For sole proprietors, tax is calculated using a four-step process according to NTA 2025:') | e }}</p>
+                                        <ol class="small">
+                                            <li><strong>{{ t('step1_help', default='Net Business Profit:') | e }}</strong> {{ t('step1_help_desc', default='Total income minus main business expenses (6 categories)') | e }}</li>
+                                            <li><strong>{{ t('step2_help', default='Statutory Deductions:') | e }}</strong> {{ t('step2_help_desc', default='Subtract statutory & legal contributions separately') | e }}</li>
+                                            <li><strong>{{ t('step3_help', default='Rent Relief:') | e }}</strong> {{ t('step3_help_desc', default='Apply rent relief (maximum ₦500,000 or 20% of rent)') | e }}</li>
+                                            <li><strong>{{ t('step4_help', default='Progressive Tax:') | e }}</strong> {{ t('step4_help_desc', default='Apply progressive tax bands to final taxable income') | e }}</li>
+                                        </ol>
+                                        {% else %}
+                                        <p class="small mb-3">{{ t('cit_explanation', default='For registered companies, tax is calculated using Companies Income Tax (CIT) rules:') | e }}</p>
+                                        <ul class="small">
+                                            <li><strong>{{ t('small_company_help', default='Small Companies (≤₦50M revenue):') | e }}</strong> {{ t('small_company_help_desc', default='0% tax rate (exempt from CIT)') | e }}</li>
+                                            <li><strong>{{ t('large_company_help', default='Large Companies (>₦50M revenue):') | e }}</strong> {{ t('large_company_help_desc', default='30% tax rate on taxable income') | e }}</li>
+                                        </ul>
+                                        {% endif %}
+                                        <p class="small text-muted mb-0">
+                                            <i class="fas fa-info-circle"></i> {{ t('calculation_note', default='Personal expenses are not tax-deductible and are excluded from calculations.') | e }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Real-time Category Totals -->
+                        <div class="category-totals mb-4" role="region" aria-labelledby="totals-heading" aria-live="polite">
+                            <h5 class="mb-3" id="totals-heading">{{ t('expense_totals_title', default='Expense Totals') | e }}</h5>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="card border-success" role="status" aria-labelledby="deductible-heading">
+                                        <div class="card-body text-center py-3">
+                                            <h6 class="card-title text-success mb-1" id="deductible-heading">{{ t('deductible_expenses', default='Deductible Expenses') | e }}</h6>
+                                            <h4 class="text-success mb-0" id="deductibleTotal" aria-live="polite" aria-label="{{ t('deductible_expenses', default='Deductible Expenses') }} total">₦0.00</h4>
+                                            <small class="text-muted">{{ t('step1_expenses', default='Step 1 Expenses') | e }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-info" role="status" aria-labelledby="statutory-heading">
+                                        <div class="card-body text-center py-3">
+                                            <h6 class="card-title text-info mb-1" id="statutory-heading">{{ t('statutory_expenses', default='Statutory Expenses') | e }}</h6>
+                                            <h4 class="text-info mb-0" id="statutoryTotal" aria-live="polite" aria-label="{{ t('statutory_expenses', default='Statutory Expenses') }} total">₦0.00</h4>
+                                            <small class="text-muted">{{ t('step2_expenses', default='Step 2 Expenses') | e }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-warning" role="status" aria-labelledby="personal-heading">
+                                        <div class="card-body text-center py-3">
+                                            <h6 class="card-title text-warning mb-1" id="personal-heading">{{ t('personal_expenses', default='Personal Expenses') | e }}</h6>
+                                            <h4 class="text-warning mb-0" id="personalTotal" aria-live="polite" aria-label="{{ t('personal_expenses', default='Personal Expenses') }} total">₦0.00</h4>
+                                            <small class="text-muted">{{ t('not_deductible', default='Not Deductible') | e }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary btn-lg" 
+                                    aria-describedby="calculate-help"
+                                    aria-label="{{ t('calculate_button', default='Calculate Tax') }} - {{ t('general_submit_form', default='Submit form to calculate tax') }}">
+                                <i class="fas fa-calculator" aria-hidden="true"></i> {{ t('calculate_button', default='Calculate Tax') | e }}
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="clearForm"
+                                    aria-label="{{ t('clear_form_button', default='Clear Form') }} - {{ t('general_clear_all_inputs', default='Clear all form inputs') }}">
+                                <i class="fas fa-eraser" aria-hidden="true"></i> {{ t('clear_form_button', default='Clear Form') | e }}
+                            </button>
+                            <div id="calculate-help" class="form-text mt-2">
+                                {{ t('calculate_help_text', default='Click to calculate your tax liability based on the entered income and expenses') }}
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tax Summary -->
+        <div class="col-lg-4">
+            <div class="card sticky-top">
+                <div class="card-header">
+                    <h3 class="card-title" id="tax-summary-heading">{{ t('tax_summary_title', default='Tax Summary') | e }}</h3>
+                </div>
+                <div class="card-body" id="taxSummary" role="region" aria-labelledby="tax-summary-heading" aria-live="polite">
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-calculator fa-3x mb-3" aria-hidden="true"></i>
+                        <p>{{ t('tax_summary_placeholder', default='Enter your income and expenses to see your tax calculation') | e }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Four-Step Process Information Card -->
+            {% if user_entity_type == 'sole_proprietor' %}
+            <div class="card mt-3" role="region" aria-labelledby="four-step-heading">
+                <div class="card-header">
+                    <h3 class="card-title" id="four-step-heading">
+                        <i class="fas fa-list-ol" aria-hidden="true"></i> {{ t('four_step_process_title', default='Four-Step Tax Calculation') | e }}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="step-info mb-3" role="listitem">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-success me-2" aria-label="{{ t('step_number', default='Step') }} 1">1</span>
+                            <strong id="step1-info-title">{{ t('step1_title', default='Net Business Profit') | e }}</strong>
+                        </div>
+                        <p class="small text-muted mb-0" aria-describedby="step1-info-title">{{ t('step1_info', default='Income minus main business expenses (6 categories)') | e }}</p>
+                    </div>
+                    
+                    <div class="step-info mb-3" role="listitem">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-info me-2" aria-label="{{ t('step_number', default='Step') }} 2">2</span>
+                            <strong id="step2-info-title">{{ t('step2_title', default='Statutory Deductions') | e }}</strong>
+                        </div>
+                        <p class="small text-muted mb-0" aria-describedby="step2-info-title">{{ t('step2_info', default='Subtract statutory & legal contributions') | e }}</p>
+                    </div>
+                    
+                    <div class="step-info mb-3" role="listitem">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-warning me-2" aria-label="{{ t('step_number', default='Step') }} 3">3</span>
+                            <strong id="step3-info-title">{{ t('step3_title', default='Rent Relief') | e }}</strong>
+                        </div>
+                        <p class="small text-muted mb-0" aria-describedby="step3-info-title">{{ t('step3_info', default='Apply rent relief (max ₦500,000 or 20% of rent)') | e }}</p>
+                    </div>
+                    
+                    <div class="step-info mb-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-primary me-2">4</span>
+                            <strong>{{ t('step4_title', default='Progressive Tax') | e }}</strong>
+                        </div>
+                        <p class="small text-muted mb-0">{{ t('step4_info', default='Apply NTA 2025 progressive tax bands') | e }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Tax Information Card -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3 class="card-title">{{ t('tax_information_title', default='Tax Information') | e }}</h3>
+                </div>
+                <div class="card-body" id="taxInformationContent">
+                    {% if user_entity_type == 'limited_liability' %}
+                    <!-- CIT Information -->
+                    <h5>{{ t('cit_rates_title', default='Companies Income Tax (CIT) Rates') | e }}</h5>
+                    <div class="alert alert-success">
+                        <h6 class="mb-2">{{ t('small_company_exemption', default='Small Company Exemption') | e }}</h6>
+                        <p class="mb-1"><strong>₦0 - ₦50,000,000:</strong> 0% {{ t('tax_rate', default='tax rate') | e }}</p>
+                        <small class="text-muted">{{ t('small_company_note', default='Companies with annual revenue of ₦50 million or less are exempt from CIT') | e }}</small>
+                    </div>
+                    <div class="alert alert-warning">
+                        <h6 class="mb-2">{{ t('large_company_rate', default='Large Company Rate') | e }}</h6>
+                        <p class="mb-1"><strong>Above ₦50,000,000:</strong> 30% {{ t('tax_rate', default='tax rate') | e }}</p>
+                        <small class="text-muted">{{ t('large_company_note', default='Companies with annual revenue above ₦50 million pay 30% tax on taxable income') | e }}</small>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h6>{{ t('cit_deductions_title', default='CIT Deductions') | e }}</h6>
+                    <p class="small text-muted">
+                        {{ t('cit_deductions_description', default='For CIT purposes, all legitimate business expenses are generally deductible from revenue to determine taxable income.') | e }}
+                    </p>
+                    {% else %}
+                    <!-- PIT Information -->
+                    <h5>{{ t('progressive_tax_rates_title', default='Progressive Tax Rates (NTA 2025)') | e }}</h5>
+                    <ul class="list-unstyled">
+                        <li><strong>₦0 - ₦800,000:</strong> 0%</li>
+                        <li><strong>₦800,001 - ₦3,000,000:</strong> 15%</li>
+                        <li><strong>₦3,000,001 - ₦12,000,000:</strong> 18%</li>
+                        <li><strong>₦12,000,001 - ₦25,000,000:</strong> 21%</li>
+                        <li><strong>₦25,000,001 - ₦50,000,000:</strong> 23%</li>
+                        <li><strong>Above ₦50,000,000:</strong> 25%</li>
+                    </ul>
+
+                    <hr>
+
+                    <h6>{{ t('rent_relief_title', default='Rent Relief') | e }}</h6>
+                    <p class="small text-muted">
+                        {{ t('rent_relief_description', default='You can claim rent relief equal to the lower of
+                        ₦500,000 or 20% of your annual rent.') | e }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Entity Type Selection Modal -->
+<div class="modal fade" id="entityTypeModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ t('select_entity_type', default='Select Business Entity Type') | e }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-4">{{ t('entity_type_description', default='Select your business entity type to ensure accurate tax calculations according to Nigerian tax law.') | e }}</p>
+                
+                {% for entity_key, entity_data in available_entity_types.items() %}
+                <div class="entity-option mb-3">
+                    <div class="card {% if entity_key == user_entity_type %}border-primary{% endif %}">
+                        <div class="card-body">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="entity_type" id="{{ entity_key }}" 
+                                       value="{{ entity_key }}" {% if entity_key == user_entity_type %}checked{% endif %}>
+                                <label class="form-check-label w-100" for="{{ entity_key }}">
+                                    <h6 class="mb-1">{{ entity_data.name }}</h6>
+                                    <p class="text-muted mb-2">{{ entity_data.description }}</p>
+                                    <small class="text-info">
+                                        <strong>{{ entity_data.tax_type }}</strong><br>
+                                        {{ entity_data.tax_details }}
+                                    </small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('cancel', default='Cancel') | e }}</button>
+                <button type="button" class="btn btn-primary" id="saveEntityType">{{ t('save_changes', default='Save Changes') | e }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-body text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">{{ t('loading_text', default='Loading...') | e }}</span>
+                </div>
+                <p class="mt-2">{{ t('calculating_tax_text', default='Calculating tax...') | e }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    /* Enhanced Tax Calculator Styles */
+    .step-card {
+        transition: all 0.3s ease;
+    }
+    
+    .step-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .calculation-formula code {
+        background-color: #f8f9fa;
+        padding: 8px 12px;
+        border-radius: 4px;
+        display: block;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+        border-left: 3px solid #007bff;
+    }
+    
+    .tax-band-item {
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        padding: 12px;
+        background-color: #f8f9fa;
+        transition: background-color 0.2s ease;
+    }
+    
+    .tax-band-item:hover {
+        background-color: #e9ecef;
+    }
+    
+    .progress-bar {
+        background: linear-gradient(45deg, #007bff, #0056b3);
+        transition: width 0.6s ease;
+    }
+    
+    .expense-category .card {
+        transition: all 0.2s ease;
+    }
+    
+    .expense-category .card:hover {
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .entity-type-info .alert {
+        border-left: 4px solid #007bff;
+    }
+    
+    .four-step-process .card-header {
+        font-weight: 600;
+    }
+    
+    .final-summary {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 16px;
+        border: 2px solid #007bff;
+    }
+    
+    .progressive-tax-bands {
+        background-color: #fff;
+        border-radius: 8px;
+        padding: 16px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .tax-bands-list {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    .summary-item {
+        padding: 8px 0;
+        border-bottom: 1px solid #f1f3f4;
+    }
+    
+    .summary-item:last-child {
+        border-bottom: none;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .step-card .card-body {
+            padding: 12px;
+        }
+        
+        .calculation-formula code {
+            font-size: 0.8em;
+            padding: 6px 8px;
+        }
+        
+        .tax-band-item {
+            padding: 8px;
+        }
+    }
+    
+    /* Visual indicators for category types */
+    .border-success {
+        border-color: #28a745 !important;
+    }
+    
+    .border-info {
+        border-color: #17a2b8 !important;
+    }
+    
+    .border-warning {
+        border-color: #ffc107 !important;
+    }
+    
+    .bg-success {
+        background-color: #28a745 !important;
+    }
+    
+    .bg-info {
+        background-color: #17a2b8 !important;
+    }
+    
+    .bg-warning {
+        background-color: #ffc107 !important;
+    }
+    
+    .bg-primary {
+        background-color: #007bff !important;
+    }
+
+    /* Accessibility improvements */
+    .sr-only {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+    }
+
+    /* High contrast focus indicators */
+    .form-control:focus,
+    .form-select:focus,
+    .btn:focus {
+        outline: 3px solid #0066cc;
+        outline-offset: 2px;
+        box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.3);
+    }
+
+    /* Improved color contrast for badges */
+    .badge.bg-success {
+        background-color: #155724 !important;
+        color: #ffffff !important;
+    }
+
+    .badge.bg-info {
+        background-color: #0c5460 !important;
+        color: #ffffff !important;
+    }
+
+    .badge.bg-warning {
+        background-color: #856404 !important;
+        color: #ffffff !important;
+    }
+
+    /* Enhanced visual indicators for tax deductible status */
+    .card.border-success {
+        border-left: 5px solid #28a745 !important;
+    }
+
+    .card.border-info {
+        border-left: 5px solid #17a2b8 !important;
+    }
+
+    .card.border-warning {
+        border-left: 5px solid #ffc107 !important;
+    }
+
+    /* Keyboard navigation indicators */
+    .expense-input:focus {
+        border-color: #0066cc;
+        box-shadow: 0 0 0 0.2rem rgba(0, 102, 204, 0.25);
+    }
+
+    /* Screen reader announcements */
+    [aria-live] {
+        position: relative;
+    }
+
+    /* Improved button accessibility */
+    .btn:focus-visible {
+        outline: 3px solid #0066cc;
+        outline-offset: 2px;
+    }
+
+    /* Enhanced tooltip accessibility */
+    [data-bs-toggle="tooltip"]:focus {
+        outline: 2px solid #0066cc;
+        outline-offset: 1px;
+    }
+
+    /* Better contrast for help text */
+    .form-text {
+        color: #495057 !important;
+        font-weight: 500;
+    }
+
+    /* Improved alert contrast */
+    .alert-warning {
+        background-color: #fff3cd;
+        border-color: #ffeaa7;
+        color: #856404;
+    }
+
+    /* Focus management for collapsible sections */
+    .collapse:focus {
+        outline: 2px solid #0066cc;
+        outline-offset: 2px;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('taxCalculatorForm');
+        const summaryDiv = document.getElementById('taxSummary');
+        const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+
+        // Accessibility and keyboard navigation improvements
+        function setupAccessibilityFeatures() {
+            // Add keyboard navigation for collapsible help section
+            const helpToggle = document.querySelector('[data-bs-target="#helpCollapse"]');
+            if (helpToggle) {
+                helpToggle.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        this.click();
+                    }
+                });
+            }
+
+            // Add keyboard navigation for category selection dropdowns
+            const categorySelects = document.querySelectorAll('select[id*="category"]');
+            categorySelects.forEach(select => {
+                select.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        // Trigger change event for screen readers
+                        this.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                });
+            });
+
+            // Improve focus management for expense inputs
+            const expenseInputs = document.querySelectorAll('.expense-input');
+            expenseInputs.forEach((input, index) => {
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'ArrowDown' && e.ctrlKey) {
+                        e.preventDefault();
+                        const nextInput = expenseInputs[index + 1];
+                        if (nextInput) {
+                            nextInput.focus();
+                        }
+                    } else if (e.key === 'ArrowUp' && e.ctrlKey) {
+                        e.preventDefault();
+                        const prevInput = expenseInputs[index - 1];
+                        if (prevInput) {
+                            prevInput.focus();
+                        }
+                    }
+                });
+            });
+
+            // Announce dynamic content changes to screen readers
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'childList' && mutation.target.id === 'taxSummary') {
+                        // Announce tax summary updates
+                        const summaryContent = mutation.target.textContent.trim();
+                        if (summaryContent && !summaryContent.includes('Enter your income')) {
+                            announceToScreenReader('Tax calculation updated');
+                        }
+                    }
+                });
+            });
+
+            observer.observe(summaryDiv, { childList: true, subtree: true });
+        }
+
+        // Function to announce messages to screen readers
+        function announceToScreenReader(message) {
+            const announcement = document.createElement('div');
+            announcement.setAttribute('aria-live', 'polite');
+            announcement.setAttribute('aria-atomic', 'true');
+            announcement.className = 'sr-only';
+            announcement.textContent = message;
+            document.body.appendChild(announcement);
+            
+            setTimeout(() => {
+                document.body.removeChild(announcement);
+            }, 1000);
+        }
+
+        // Initialize accessibility features
+        setupAccessibilityFeatures();
+
+        // Tax calculation validation functions
+        function validateIncome(value) {
+            const errors = [];
+            if (!value || value.toString().trim() === '') {
+                errors.push('{{ t("validation_income_required", default="Total income is required") }}');
+            } else {
+                const income = parseFloat(value);
+                if (isNaN(income)) {
+                    errors.push('{{ t("validation_income_invalid", default="Please enter a valid income amount") }}');
+                } else if (income < 0) {
+                    errors.push('{{ t("validation_income_negative", default="Income cannot be negative") }}');
+                } else if (income > 9999999999.99) {
+                    errors.push('{{ t("validation_income_too_large", default="Income amount is unreasonably large") }}');
+                }
+            }
+            return errors;
+        }
+        
+        function validateRent(value) {
+            const errors = [];
+            if (value && value.toString().trim() !== '') {
+                const rent = parseFloat(value);
+                if (isNaN(rent)) {
+                    errors.push('{{ t("validation_rent_invalid", default="Please enter a valid rent amount") }}');
+                } else if (rent < 0) {
+                    errors.push('{{ t("validation_rent_negative", default="Annual rent cannot be negative") }}');
+                } else if (rent > 999999999.99) {
+                    errors.push('{{ t("validation_rent_too_large", default="Annual rent amount is unreasonably large") }}');
+                }
+            }
+            return errors;
+        }
+        
+        function validateExpenseAmount(value, categoryName) {
+            const errors = [];
+            if (value && value.toString().trim() !== '') {
+                const amount = parseFloat(value);
+                if (isNaN(amount)) {
+                    errors.push(`{{ t("validation_expense_invalid", default="Please enter a valid amount for") }} ${categoryName}`);
+                } else if (amount < 0) {
+                    errors.push(`{{ t("validation_expense_negative", default="Expense amount cannot be negative for") }} ${categoryName}`);
+                } else if (amount > 999999999.99) {
+                    errors.push(`{{ t("validation_expense_too_large", default="Expense amount is unreasonably large for") }} ${categoryName}`);
+                }
+            }
+            return errors;
+        }
+        
+        function showFieldError(fieldId, errors) {
+            const field = document.getElementById(fieldId);
+            if (!field) return;
+            
+            const errorContainer = field.parentNode.querySelector('.validation-error');
+            
+            // Remove existing error container
+            if (errorContainer) {
+                errorContainer.remove();
+            }
+            
+            // Add error styling
+            if (errors.length > 0) {
+                field.classList.add('is-invalid');
+                
+                // Create error container
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'validation-error text-danger mt-1 small';
+                errorDiv.innerHTML = errors.map(error => `<div>${error}</div>`).join('');
+                field.parentNode.appendChild(errorDiv);
+            } else {
+                field.classList.remove('is-invalid');
+                field.classList.add('is-valid');
+            }
+        }
+        
+        function clearFieldError(fieldId) {
+            const field = document.getElementById(fieldId);
+            if (!field) return;
+            
+            const errorContainer = field.parentNode.querySelector('.validation-error');
+            
+            if (errorContainer) {
+                errorContainer.remove();
+            }
+            
+            field.classList.remove('is-invalid', 'is-valid');
+        }
+        
+        function validateForm() {
+            let hasErrors = false;
+            const errors = [];
+            
+            // Validate income
+            const incomeField = document.getElementById('total_income');
+            if (incomeField) {
+                const incomeErrors = validateIncome(incomeField.value);
+                showFieldError('total_income', incomeErrors);
+                if (incomeErrors.length > 0) {
+                    hasErrors = true;
+                    errors.push(...incomeErrors);
+                }
+            }
+            
+            // Validate rent
+            const rentField = document.getElementById('annual_rent');
+            if (rentField) {
+                const rentErrors = validateRent(rentField.value);
+                showFieldError('annual_rent', rentErrors);
+                if (rentErrors.length > 0) {
+                    hasErrors = true;
+                    errors.push(...rentErrors);
+                }
+            }
+            
+            // Validate expense amounts
+            const expenseInputs = document.querySelectorAll('.expense-input');
+            expenseInputs.forEach(input => {
+                const categoryName = input.closest('.expense-category')?.querySelector('.card-title')?.textContent || input.id;
+                const expenseErrors = validateExpenseAmount(input.value, categoryName);
+                showFieldError(input.id, expenseErrors);
+                if (expenseErrors.length > 0) {
+                    hasErrors = true;
+                    errors.push(...expenseErrors);
+                }
+            });
+            
+            return { isValid: !hasErrors, errors: errors };
+        }
+        
+        // Add real-time validation
+        const incomeField = document.getElementById('total_income');
+        if (incomeField) {
+            incomeField.addEventListener('blur', function() {
+                const errors = validateIncome(this.value);
+                showFieldError('total_income', errors);
+            });
+            
+            incomeField.addEventListener('input', function() {
+                if (this.classList.contains('is-invalid')) {
+                    const errors = validateIncome(this.value);
+                    if (errors.length === 0) {
+                        clearFieldError('total_income');
+                    }
+                }
+            });
+        }
+        
+        const rentField = document.getElementById('annual_rent');
+        if (rentField) {
+            rentField.addEventListener('blur', function() {
+                const errors = validateRent(this.value);
+                showFieldError('annual_rent', errors);
+            });
+            
+            rentField.addEventListener('input', function() {
+                if (this.classList.contains('is-invalid')) {
+                    const errors = validateRent(this.value);
+                    if (errors.length === 0) {
+                        clearFieldError('annual_rent');
+                    }
+                }
+            });
+        }
+        
+        // Add validation to expense inputs
+        document.querySelectorAll('.expense-input').forEach(input => {
+            input.addEventListener('blur', function() {
+                const categoryName = this.closest('.expense-category')?.querySelector('.card-title')?.textContent || this.id;
+                const errors = validateExpenseAmount(this.value, categoryName);
+                showFieldError(this.id, errors);
+            });
+            
+            input.addEventListener('input', function() {
+                if (this.classList.contains('is-invalid')) {
+                    const categoryName = this.closest('.expense-category')?.querySelector('.card-title')?.textContent || this.id;
+                    const errors = validateExpenseAmount(this.value, categoryName);
+                    if (errors.length === 0) {
+                        clearFieldError(this.id);
+                    }
+                }
+            });
+        });
+
+        // Format currency
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-NG', {
+                style: 'currency',
+                currency: 'NGN',
+                minimumFractionDigits: 2
+            }).format(amount);
+        }
+
+        // Format percentage
+        function formatPercentage(rate) {
+            return (rate).toFixed(2) + '%';
+        }
+
+        // Update tax summary based on entity type
+        function updateTaxSummary(breakdown) {
+            let html = '';
+            
+            if (breakdown.calculation_type === 'CIT') {
+                // Companies Income Tax display
+                html = generateCITSummary(breakdown);
+            } else {
+                // Personal Income Tax display with four-step breakdown
+                html = generatePITSummary(breakdown);
+            }
+
+            summaryDiv.innerHTML = html;
+        }
+
+        // Generate CIT summary display
+        function generateCITSummary(breakdown) {
+            return `
+                <div class="tax-breakdown">
+                    <div class="alert alert-info mb-3">
+                        <small><i class="fas fa-building"></i> <strong>Companies Income Tax (CIT)</strong></small>
+                    </div>
+                    
+                    <div class="summary-item mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-bold">{{ t('total_revenue_summary', default='Total Revenue:') | e }}</span>
+                            <span class="text-success">${formatCurrency(breakdown.total_revenue || breakdown.total_income)}</span>
+                        </div>
+                    </div>
+                    
+                    ${breakdown.total_expenses ? `
+                    <div class="summary-item mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>{{ t('total_expenses_summary', default='Total Expenses:') | e }}</span>
+                            <span class="text-danger">-${formatCurrency(breakdown.total_expenses)}</span>
+                        </div>
+                    </div>
+                    ` : ''}
+                    
+                    ${breakdown.exemption_applied ? `
+                    <div class="alert alert-success mb-3">
+                        <small><i class="fas fa-check-circle"></i> <strong>Small Company Exemption Applied</strong><br>
+                        Revenue ≤ ₦${formatCurrency(breakdown.revenue_threshold).replace('₦', '')} = 0% tax rate</small>
+                    </div>
+                    ` : `
+                    <div class="summary-item mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-bold">{{ t('taxable_income_label', default='Taxable Income:') | e }}</span>
+                            <span class="fw-bold">${formatCurrency(breakdown.taxable_income)}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="summary-item mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>{{ t('cit_tax_rate', default='CIT Tax Rate:') | e }}</span>
+                            <span>${formatPercentage(breakdown.tax_rate * 100)}</span>
+                        </div>
+                    </div>
+                    `}
+                    
+                    <hr>
+                    
+                    <div class="summary-item mb-4">
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-bold text-primary fs-5">{{ t('tax_liability_summary', default='Tax Liability:') | e }}</span>
+                            <span class="fw-bold text-primary fs-5">${formatCurrency(breakdown.tax_liability)}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="summary-item">
+                        <div class="d-flex justify-content-between">
+                            <span>{{ t('effective_tax_rate_summary', default='Effective Tax Rate:') | e }}</span>
+                            <span>${formatPercentage(breakdown.effective_tax_rate)}</span>
+                        </div>
+                    </div>
+                    
+                    ${breakdown.calculation_steps ? generateCITStepsDisplay(breakdown.calculation_steps) : ''}
+                </div>
+            `;
+        }
+
+        // Generate PIT summary with four-step breakdown
+        function generatePITSummary(breakdown) {
+            const fourStepBreakdown = breakdown.four_step_breakdown || {};
+            const summary = breakdown.summary || {};
+            
+            return `
+                <div class="tax-breakdown">
+                    <div class="alert alert-info mb-3">
+                        <small><i class="fas fa-user"></i> <strong>Personal Income Tax (PIT) - Four-Step Calculation</strong></small>
+                    </div>
+                    
+                    <!-- Four-Step Process Display -->
+                    <div class="four-step-process mb-4">
+                        ${generateStepDisplay(fourStepBreakdown.step1, 1, 'success')}
+                        ${generateStepDisplay(fourStepBreakdown.step2, 2, 'info')}
+                        ${generateStepDisplay(fourStepBreakdown.step3, 3, 'warning')}
+                        ${generateStepDisplay(fourStepBreakdown.step4, 4, 'primary')}
+                    </div>
+                    
+                    <!-- Final Summary -->
+                    <div class="final-summary">
+                        <hr>
+                        <div class="summary-item mb-3">
+                            <div class="d-flex justify-content-between">
+                                <span class="fw-bold">{{ t('final_taxable_income', default='Final Taxable Income:') | e }}</span>
+                                <span class="fw-bold">${formatCurrency(summary.final_taxable_income || 0)}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="summary-item mb-4">
+                            <div class="d-flex justify-content-between">
+                                <span class="fw-bold text-primary fs-5">{{ t('tax_liability_summary', default='Tax Liability:') | e }}</span>
+                                <span class="fw-bold text-primary fs-5">${formatCurrency(summary.tax_liability || 0)}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="summary-item mb-3">
+                            <div class="d-flex justify-content-between">
+                                <span>{{ t('effective_tax_rate_summary', default='Effective Tax Rate:') | e }}</span>
+                                <span>${formatPercentage(summary.effective_tax_rate || 0)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Progressive Tax Bands Visualization -->
+                    ${fourStepBreakdown.step4 && fourStepBreakdown.step4.tax_band_breakdown ? 
+                        generateProgressiveTaxBandsDisplay(fourStepBreakdown.step4.tax_band_breakdown) : ''}
+                </div>
+            `;
+        }
+
+        // Generate individual step display for PIT
+        function generateStepDisplay(stepData, stepNumber, colorClass) {
+            if (!stepData) return '';
+            
+            return `
+                <div class="step-card mb-3">
+                    <div class="card border-${colorClass}">
+                        <div class="card-header bg-${colorClass} text-white py-2">
+                            <h6 class="mb-0">
+                                <i class="fas fa-calculator"></i> 
+                                Step ${stepNumber}: ${stepData.step_name || 'Calculation Step'}
+                            </h6>
+                        </div>
+                        <div class="card-body py-2">
+                            <p class="small text-muted mb-2">${stepData.description || ''}</p>
+                            <div class="calculation-formula">
+                                <code class="small">${stepData.formula || ''}</code>
+                            </div>
+                            ${stepData.calculation_note ? `
+                                <small class="text-info d-block mt-2">
+                                    <i class="fas fa-info-circle"></i> ${stepData.calculation_note}
+                                </small>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Generate CIT calculation steps display
+        function generateCITStepsDisplay(steps) {
+            if (!steps || !Array.isArray(steps)) return '';
+            
+            return `
+                <div class="calculation-steps mt-4">
+                    <h6 class="mb-3">{{ t('calculation_steps', default='Calculation Steps:') | e }}</h6>
+                    ${steps.map(step => `
+                        <div class="step-item mb-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="small"><strong>Step ${step.step}:</strong> ${step.description}</span>
+                                <span class="badge bg-secondary">${typeof step.result === 'number' ? formatCurrency(step.result) : step.result}</span>
+                            </div>
+                            <div class="small text-muted">${step.calculation}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // Generate progressive tax bands visualization
+        function generateProgressiveTaxBandsDisplay(taxBands) {
+            if (!taxBands || !Array.isArray(taxBands) || taxBands.length === 0) return '';
+            
+            const totalTax = taxBands.reduce((sum, band) => sum + (band.tax_amount || 0), 0);
+            
+            return `
+                <div class="progressive-tax-bands mt-4">
+                    <hr>
+                    <h6 class="mb-3">
+                        <i class="fas fa-chart-bar"></i> {{ t('progressive_tax_breakdown', default='Progressive Tax Breakdown:') | e }}
+                    </h6>
+                    <div class="tax-bands-list">
+                        ${taxBands.map((band, index) => {
+                            const percentage = totalTax > 0 ? (band.tax_amount / totalTax * 100) : 0;
+                            return `
+                                <div class="tax-band-item mb-2">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="small fw-bold">${band.description}</span>
+                                        <span class="badge bg-primary">${formatCurrency(band.tax_amount)}</span>
+                                    </div>
+                                    <div class="progress mb-1" style="height: 8px;">
+                                        <div class="progress-bar bg-gradient" role="progressbar" 
+                                             style="width: ${percentage}%" 
+                                             aria-valuenow="${percentage}" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    <div class="small text-muted">${band.formula}</div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    <div class="total-tax-summary mt-3 pt-2 border-top">
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-bold">{{ t('total_progressive_tax', default='Total Progressive Tax:') | e }}</span>
+                            <span class="fw-bold text-primary">${formatCurrency(totalTax)}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Handle form submission
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            // Validate form before submission
+            const validation = validateForm();
+            if (!validation.isValid) {
+                // Show validation errors
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger alert-dismissible fade show mt-3';
+                alertDiv.innerHTML = `
+                    <strong>{{ t("validation_form_errors", default="Please correct the following errors:") }}</strong>
+                    <ul class="mb-0 mt-2">
+                        ${validation.errors.map(error => `<li>${error}</li>`).join('')}
+                    </ul>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                
+                // Remove existing alert
+                const existingAlert = form.querySelector('.alert-danger');
+                if (existingAlert) {
+                    existingAlert.remove();
+                }
+                
+                form.insertBefore(alertDiv, form.firstChild);
+                
+                // Scroll to first error
+                const firstError = form.querySelector('.is-invalid');
+                if (firstError) {
+                    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    firstError.focus();
+                }
+                
+                return;
+            }
+
+            // Show loading modal
+            loadingModal.show();
+
+            // Collect form data
+            const formData = new FormData(form);
+            
+            // Collect categorized expenses
+            const expenses = {};
+            const expenseInputs = form.querySelectorAll('.expense-input');
+            expenseInputs.forEach(input => {
+                const categoryKey = input.name;
+                const amount = parseFloat(input.value) || 0;
+                if (amount > 0) {
+                    expenses[categoryKey] = amount;
+                }
+            });
+            
+            const data = {
+                total_income: parseFloat(formData.get('total_income')) || 0,
+                annual_rent: parseFloat(formData.get('annual_rent')) || 0,
+                expenses: expenses
+            };
+
+            // Send calculation request
+            fetch('/tax/calculate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(result => {
+                    loadingModal.hide();
+
+                    if (result.success) {
+                        updateTaxSummary(result.breakdown);
+
+                        // Update annual rent in database if changed
+                        const currentRent = {{ user_annual_rent }};
+                        if (parseFloat(data.annual_rent) !== currentRent) {
+                            updateAnnualRent(data.annual_rent);
+                        }
+                    } else {
+                        showAlert('danger', '{{ t("tax_calculation_error", default="Error calculating tax:") | e }} ' + (result.message || result.error));
+                    }
+                })
+                .catch(error => {
+                    loadingModal.hide();
+                    console.error('Error:', error);
+                    showAlert('danger', '{{ t("tax_calculation_network_error", default="An error occurred while calculating tax. Please check your connection and try again.") | e }}');
+                });
+    });
+
+    // Update annual rent in database
+    function updateAnnualRent(annualRent) {
+        fetch('/tax/update-rent', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ annual_rent: annualRent })
+        })
+            .then(response => response.json())
+            .then(result => {
+                if (!result.success) {
+                    console.error('Failed to update annual rent:', result.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error updating annual rent:', error);
+            });
+    }
+
+    // Handle entity type change
+    document.getElementById('saveEntityType').addEventListener('click', function () {
+        const selectedEntityType = document.querySelector('input[name="entity_type"]:checked');
+        if (!selectedEntityType) {
+            alert('Please select an entity type');
+            return;
+        }
+
+        const entityType = selectedEntityType.value;
+        
+        // Show loading
+        const saveButton = this;
+        const originalText = saveButton.textContent;
+        saveButton.disabled = true;
+        saveButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+
+        // Update entity type
+        fetch('/tax/update-entity-type', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ entity_type: entityType })
+        })
+        .then(response => response.json())
+        .then(result => {
+            saveButton.disabled = false;
+            saveButton.textContent = originalText;
+
+            if (result.success) {
+                // Update UI with new entity type
+                document.querySelector('.entity-type-name').textContent = result.entity_info.name;
+                
+                // Update tax information section
+                updateTaxInformationSection(result.entity_info, entityType);
+                
+                // Close modal
+                bootstrap.Modal.getInstance(document.getElementById('entityTypeModal')).hide();
+                
+                // Clear current calculation
+                clearTaxSummary();
+                
+                // Show success message
+                showAlert('success', 'Entity type updated successfully. Please recalculate your tax.');
+            } else {
+                showAlert('danger', 'Error updating entity type: ' + result.error);
+            }
+        })
+        .catch(error => {
+            saveButton.disabled = false;
+            saveButton.textContent = originalText;
+            console.error('Error:', error);
+            showAlert('danger', 'An error occurred while updating entity type');
+        });
+    });
+
+    // Update tax information section based on entity type
+    function updateTaxInformationSection(entityInfo, entityType) {
+        const taxInfoContent = document.getElementById('taxInformationContent');
+        
+        if (entityType === 'limited_liability') {
+            // CIT Information
+            taxInfoContent.innerHTML = `
+                <h5>{{ t('cit_rates_title', default='Companies Income Tax (CIT) Rates') | e }}</h5>
+                <div class="alert alert-success">
+                    <h6 class="mb-2">{{ t('small_company_exemption', default='Small Company Exemption') | e }}</h6>
+                    <p class="mb-1"><strong>₦0 - ₦50,000,000:</strong> 0% {{ t('tax_rate', default='tax rate') | e }}</p>
+                    <small class="text-muted">{{ t('small_company_note', default='Companies with annual revenue of ₦50 million or less are exempt from CIT') | e }}</small>
+                </div>
+                <div class="alert alert-warning">
+                    <h6 class="mb-2">{{ t('large_company_rate', default='Large Company Rate') | e }}</h6>
+                    <p class="mb-1"><strong>Above ₦50,000,000:</strong> 30% {{ t('tax_rate', default='tax rate') | e }}</p>
+                    <small class="text-muted">{{ t('large_company_note', default='Companies with annual revenue above ₦50 million pay 30% tax on taxable income') | e }}</small>
+                </div>
+                
+                <hr>
+                
+                <h6>{{ t('cit_deductions_title', default='CIT Deductions') | e }}</h6>
+                <p class="small text-muted">
+                    {{ t('cit_deductions_description', default='For CIT purposes, all legitimate business expenses are generally deductible from revenue to determine taxable income.') | e }}
+                </p>
+            `;
+        } else {
+            // PIT Information
+            taxInfoContent.innerHTML = `
+                <h5>{{ t('progressive_tax_rates_title', default='Progressive Tax Rates (NTA 2025)') | e }}</h5>
+                <ul class="list-unstyled">
+                    <li><strong>₦0 - ₦800,000:</strong> 0%</li>
+                    <li><strong>₦800,001 - ₦3,000,000:</strong> 15%</li>
+                    <li><strong>₦3,000,001 - ₦12,000,000:</strong> 18%</li>
+                    <li><strong>₦12,000,001 - ₦25,000,000:</strong> 21%</li>
+                    <li><strong>₦25,000,001 - ₦50,000,000:</strong> 23%</li>
+                    <li><strong>Above ₦50,000,000:</strong> 25%</li>
+                </ul>
+
+                <hr>
+
+                <h6>{{ t('rent_relief_title', default='Rent Relief') | e }}</h6>
+                <p class="small text-muted">
+                    {{ t('rent_relief_description', default='You can claim rent relief equal to the lower of
+                    ₦500,000 or 20% of your annual rent.') | e }}
+                </p>
+            `;
+        }
+    }
+
+    // Show alert message
+    function showAlert(type, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        // Insert at top of page
+        const container = document.querySelector('.container-fluid');
+        container.insertBefore(alertDiv, container.firstChild);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+
+    // Clear tax summary
+    function clearTaxSummary() {
+        summaryDiv.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-calculator fa-3x mb-3"></i>
+                <p>{{ t('tax_summary_placeholder', default='Enter your income and expenses to see your tax calculation') | e }}</p>
+            </div>
+        `;
+    }
+
+    // Clear form
+    document.getElementById('clearForm').addEventListener('click', function () {
+        form.reset();
+        clearTaxSummary();
+    });
+
+    // Update category totals in real-time
+    function updateCategoryTotals() {
+        let deductibleTotal = 0;
+        let statutoryTotal = 0;
+        let personalTotal = 0;
+        
+        const expenseInputs = form.querySelectorAll('.expense-input');
+        expenseInputs.forEach(input => {
+            const amount = parseFloat(input.value) || 0;
+            const categoryType = input.getAttribute('data-category-type');
+            
+            switch(categoryType) {
+                case 'deductible':
+                    deductibleTotal += amount;
+                    break;
+                case 'statutory':
+                    statutoryTotal += amount;
+                    break;
+                case 'personal':
+                    personalTotal += amount;
+                    break;
+            }
+        });
+        
+        // Update display
+        document.getElementById('deductibleTotal').textContent = formatCurrency(deductibleTotal);
+        document.getElementById('statutoryTotal').textContent = formatCurrency(statutoryTotal);
+        document.getElementById('personalTotal').textContent = formatCurrency(personalTotal);
+    }
+
+    // Auto-calculate on input change (debounced)
+    let calculateTimeout;
+    const inputs = form.querySelectorAll('input[type="number"]');
+    inputs.forEach(input => {
+        input.addEventListener('input', function () {
+            // Update category totals immediately
+            updateCategoryTotals();
+            
+            clearTimeout(calculateTimeout);
+            calculateTimeout = setTimeout(() => {
+                // Only auto-calculate if total income is entered
+                const totalIncome = document.getElementById('total_income').value;
+                if (totalIncome && parseFloat(totalIncome) > 0) {
+                    form.dispatchEvent(new Event('submit'));
+                }
+            }, 1000);
+        });
+    });
+
+    // Initialize category totals on page load
+    updateCategoryTotals();
+});
+</script>
+{% endblock %}

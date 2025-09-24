@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ trans('rewards_title', default='Rewards') | escape }}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="text-primary mb-4">
+        <i class="bi bi-trophy me-2"></i>
+        {{ trans('rewards_title', default='Rewards') | escape }}
+    </h1>
+
+    <!-- Rewards Overview -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h3>{{ trans('rewards_your_progress', default='Your Rewards Progress') | escape }}</h3>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="alert alert-success d-flex align-items-center" role="alert">
+                        <i class="bi bi-fire me-2"></i>
+                        <div>
+                            {{ trans('rewards_streak', default='Current Streak:') | escape }}
+                            <strong>{{ streak | default(0) }}</strong> {{ trans('rewards_days', default='days') | escape }}
+                            {% if streak is defined and streak >= 3 %}
+                            <span class="badge bg-warning text-dark ms-2">{{ trans('streak_reward', default='Keep it up!') | escape }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="alert alert-info d-flex align-items-center" role="alert">
+                        <i class="bi bi-coin me-2"></i>
+                        <div>
+                            {{ trans('rewards_points', default='Points:') | escape }}
+                            <strong>{{ points | default(0) }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% if can_redeem %}
+            <form method="POST" action="{{ url_for('rewards.redeem') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-primary">
+                    {{ trans('rewards_redeem', default='Redeem 100 Points for 30% Discount') | escape }}
+                </button>
+            </form>
+            {% elif discount_applied %}
+            <div class="alert alert-success">
+                {{ trans('rewards_discount_applied', default='You have a 30% discount applied to your next subscription!') | escape }}
+            </div>
+            {% else %}
+            <p class="text-muted">{{ trans('rewards_points_needed', default='You need 100 points to redeem a 30% discount on your next subscription.') | escape }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tips Section -->
+    <div class="card">
+        <div class="card-body">
+            <h3>{{ trans('rewards_tips_title', default='How to Earn Rewards') | escape }}</h3>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item">
+                    {{ trans('rewards_tip1', default='Log any transaction (debtor, creditor, receipt, payment, or fund) daily to maintain your streak.') | escape }}
+                </li>
+                <li class="list-group-item">
+                    {{ trans('rewards_tip2', default='Each day with a transaction earns 1 point.') | escape }}
+                </li>
+                <li class="list-group-item">
+                    {{ trans('rewards_tip3', default='Reach 100 points to redeem a 30% discount on your next subscription.') | escape }}
+                </li>
+                <li class="list-group-item">
+                    {{ trans('rewards_tip4', default='Missing a day will reset your streak, so stay consistent!') | escape }}
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
