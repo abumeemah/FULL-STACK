@@ -166,7 +166,7 @@ TRADER_NAV = [
         "icon": "bi-percent"
     },
     {
-        "endpoint": "education_bp.education_home",
+        "endpoint": "education.education_home",
         "label": "Tax Education",
         "label_key": "tax_education",
         "description_key": "tax_education_desc",
@@ -1874,3 +1874,4 @@ def calculate_four_step_tax_liability(user_id, tax_year):
             'final_tax_liability': 0.0,
             'effective_tax_rate': 0.0
         }
+
