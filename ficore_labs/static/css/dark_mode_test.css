@@ -1,0 +1,217 @@
+/* Dark Mode Test Styles - Remove after testing */
+/* This file helps identify elements that may not be properly styled for dark mode */
+
+.dark-mode-test {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: #ff0000;
+    color: #ffffff;
+    padding: 10px;
+    border-radius: 5px;
+    z-index: 10000;
+    font-size: 12px;
+    display: none;
+}
+
+.dark-mode .dark-mode-test {
+    display: block;
+}
+
+/* Highlight elements that might have poor contrast in dark mode */
+.dark-mode *:not([style*="color"]):not(.btn):not(.badge):not(.alert) {
+    /* This will help identify elements without explicit color styling */
+}
+
+/* Test for elements that might be invisible */
+.dark-mode .test-visibility {
+    outline: 1px solid #ff0000 !important;
+}
+
+/* Test contrast ratios */
+.dark-mode .low-contrast-test {
+    background: #ff0000 !important;
+    color: #ffffff !important;
+}
+
+/* Debugging helper - shows all elements with their computed colors */
+.debug-dark-mode * {
+    box-shadow: inset 0 0 0 1px rgba(255, 0, 0, 0.3) !important;
+}
+
+.debug-dark-mode *:hover {
+    background: rgba(255, 255, 0, 0.1) !important;
+}
+
+/* Test for proper text visibility */
+.dark-mode-text-test {
+    background: var(--background-main);
+    color: var(--text-color);
+    padding: 20px;
+    margin: 20px;
+    border: 1px solid var(--card-border);
+}
+
+.dark-mode-text-test h1,
+.dark-mode-text-test h2,
+.dark-mode-text-test h3,
+.dark-mode-text-test h4,
+.dark-mode-text-test h5,
+.dark-mode-text-test h6 {
+    color: var(--text-color);
+}
+
+.dark-mode-text-test p {
+    color: var(--text-color);
+}
+
+.dark-mode-text-test .text-muted {
+    color: var(--text-muted);
+}
+
+/* Test for button visibility */
+.dark-mode-button-test {
+    display: flex;
+    gap: 10px;
+    padding: 20px;
+    flex-wrap: wrap;
+}
+
+/* Test for form element visibility */
+.dark-mode-form-test {
+    padding: 20px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    margin: 20px;
+}
+
+.dark-mode-form-test input,
+.dark-mode-form-test textarea,
+.dark-mode-form-test select {
+    margin: 10px 0;
+    width: 100%;
+    max-width: 300px;
+}
+
+/* Test for table visibility */
+.dark-mode-table-test {
+    margin: 20px;
+}
+
+.dark-mode-table-test table {
+    width: 100%;
+    max-width: 600px;
+}
+
+/* Test for card visibility */
+.dark-mode-card-test {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    padding: 20px;
+}
+
+.dark-mode-card-test .card {
+    padding: 20px;
+}
+
+/* Test for navigation visibility */
+.dark-mode-nav-test {
+    background: var(--navbar-bg);
+    padding: 10px;
+    margin: 20px;
+}
+
+.dark-mode-nav-test a {
+    color: var(--navbar-text-color);
+    margin: 0 10px;
+    text-decoration: none;
+}
+
+.dark-mode-nav-test a:hover {
+    color: var(--accent-blue);
+}
+
+/* Test for alert visibility */
+.dark-mode-alert-test {
+    padding: 20px;
+}
+
+.dark-mode-alert-test .alert {
+    margin: 10px 0;
+}
+
+/* Test for modal visibility */
+.dark-mode-modal-test .modal-content {
+    background: var(--card-bg);
+    color: var(--text-color);
+    border: 1px solid var(--card-border);
+}
+
+/* Test for dropdown visibility */
+.dark-mode-dropdown-test .dropdown-menu {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+}
+
+.dark-mode-dropdown-test .dropdown-item {
+    color: var(--text-color);
+}
+
+.dark-mode-dropdown-test .dropdown-item:hover {
+    background: var(--button-secondary-hover);
+}
+
+/* Accessibility test for focus indicators */
+.dark-mode *:focus {
+    outline: 2px solid var(--accent-blue) !important;
+    outline-offset: 2px;
+}
+
+/* Test for proper contrast ratios */
+.contrast-test-aa {
+    background: #1e293b;
+    color: #f1f5f9;
+    padding: 10px;
+    margin: 5px;
+}
+
+.contrast-test-aaa {
+    background: #0f172a;
+    color: #ffffff;
+    padding: 10px;
+    margin: 5px;
+}
+
+/* Test for color blindness accessibility */
+.colorblind-test {
+    display: flex;
+    gap: 10px;
+    padding: 20px;
+}
+
+.colorblind-test .success {
+    background: #10b981;
+    color: #ffffff;
+    padding: 10px;
+}
+
+.colorblind-test .danger {
+    background: #ef4444;
+    color: #ffffff;
+    padding: 10px;
+}
+
+.colorblind-test .warning {
+    background: #f59e0b;
+    color: #1f2937;
+    padding: 10px;
+}
+
+.colorblind-test .info {
+    background: #3b82f6;
+    color: #ffffff;
+    padding: 10px;
+}
+
+/* Remove this file after testing is complete */
