@@ -1100,38 +1100,6 @@ def contact_waitlist_entry(entry_id):
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return redirect(url_for('admin.view_waitlist'))
 
-# Tax Configuration Management Routes
-@admin_bp.route('/tax/config', methods=['GET'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("30 per hour")
-def tax_config():
-    """Tax configuration management dashboard."""
-    try:
-        from admin_tax_config import get_tax_rates, get_tax_bands, get_tax_exemptions
-        
-        current_year = datetime.now().year
-        
-        # Get current tax configurations
-        tax_rates = get_tax_rates(current_year)
-        tax_bands = get_tax_bands(current_year)
-        tax_exemptions = get_tax_exemptions(current_year)
-        
-        logger.info(f"Admin {current_user.id} accessed tax configuration",
-                    extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        
-        return render_template('admin/tax_config.html',
-                             tax_rates=tax_rates,
-                             tax_bands=tax_bands,
-                             tax_exemptions=tax_exemptions,
-                             current_year=current_year,
-                             title=trans('admin_tax_config', default='Tax Configuration'))
-    
-    except Exception as e:
-        logger.error(f"Error loading tax configuration for admin {current_user.id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_tax_config_error', default='An error occurred while loading tax configuration'), 'danger')
-        return render_template('error/500.html'), 500
 
 @admin_bp.route('/tax/rates', methods=['GET', 'POST'])
 @login_required
@@ -1465,7 +1433,6 @@ def generate_investor_report_csv(report_data):
         flash(trans('admin_report_error', default='An error occurred while generating the report'), 'danger')
         return render_template('error/500.html'), 500
 
-# Tax Configuration Management Routes
 @admin_bp.route('/tax/config', methods=['GET'])
 @login_required
 @utils.requires_role('admin')
@@ -1474,39 +1441,33 @@ def tax_config():
     """Tax configuration management dashboard."""
     try:
         from admin_tax_config import get_tax_rates, get_tax_bands, get_tax_exemptions
-        
         db = utils.get_mongo_db()
         if db is None:
             raise Exception("Failed to connect to MongoDB")
-        
-        # Get current tax configuration
         current_year = datetime.now().year
         tax_rates = get_tax_rates(current_year)
         tax_bands = get_tax_bands(current_year)
         tax_exemptions = get_tax_exemptions(current_year)
-        
         stats = {
             'tax_rates': len(tax_rates),
             'tax_bands': len(tax_bands),
             'tax_exemptions': len(tax_exemptions),
             'current_year': current_year
         }
-        
         logger.info(f"Admin {current_user.id} accessed tax configuration",
                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        
-        return render_template('admin/tax_config.html', 
-                             stats=stats,
-                             tax_rates=tax_rates,
-                             tax_bands=tax_bands,
-                             tax_exemptions=tax_exemptions,
-                             title=trans('admin_tax_config_title', default='Tax Configuration Management'))
+        return render_template('admin/tax_config.html',
+                              stats=stats,
+                              tax_rates=tax_rates,
+                              tax_bands=tax_bands,
+                              tax_exemptions=tax_exemptions,
+                              title=trans('admin_tax_config_title', default='Tax Configuration Management'))
     except Exception as e:
         logger.error(f"Error loading tax configuration for admin {current_user.id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
-
+        
 @admin_bp.route('/tax/rates', methods=['GET', 'POST'])
 @login_required
 @utils.requires_role('admin')
@@ -2159,3 +2120,4 @@ def system_health_monitor():
         logger.error(f"Error loading system health: {str(e)}")
         flash(trans('admin_health_error', default='Error loading system health data'), 'danger')
         return redirect(url_for('admin.dashboard'))
+
