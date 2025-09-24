@@ -71,22 +71,132 @@
     </div>
 
     <h2>{{ t('admin_quick_actions', default='Quick Actions') }}</h2>
-    <div class="d-grid gap-2">
-        <a href="{{ url_for('admin.manage_users') }}" class="btn btn-primary">{{ t('admin_manage_users', default='Manage Users') }}</a>
-        <a href="{{ url_for('admin.manage_user_roles') }}" class="btn btn-primary">{{ t('admin_manage_user_roles', default='Manage User Roles') }}</a>
-        <a href="{{ url_for('admin.manage_user_subscriptions') }}" class="btn btn-primary">{{ t('admin_manage_user_subscriptions', default='Manage User Subscriptions') }}</a>
-        <a href="{{ url_for('admin.manage_debtors') }}" class="btn btn-primary">{{ t('admin_manage_debtors', default='Manage Debtors') }}</a>
-        <a href="{{ url_for('admin.manage_creditors') }}" class="btn btn-primary">{{ t('admin_manage_creditors', default='Manage Creditors') }}</a>
-        <a href="{{ url_for('admin.manage_funds') }}" class="btn btn-primary">{{ t('admin_manage_funds', default='Manage Funds') }}</a>
-        <a href="{{ url_for('admin.manage_records') }}" class="btn btn-primary">{{ t('admin_manage_records', default='Manage Income Records') }}</a>
-        <a href="{{ url_for('admin.manage_cashflows') }}" class="btn btn-primary">{{ t('admin_manage_cashflows', default='Manage Payment Outflows') }}</a>
-        <a href="{{ url_for('admin.customer_reports') }}" class="btn btn-primary">{{ t('admin_customer_reports', default='Customer Reports') }}</a>
-        <a href="{{ url_for('admin.investor_reports') }}" class="btn btn-primary">{{ t('admin_investor_reports', default='Investor Reports') }}</a>
-        <a href="{{ url_for('admin.manage_forecasts') }}" class="btn btn-primary">{{ t('admin_forecasts', default='Financial Forecasts') }}</a>
-        <a href="{{ url_for('admin.audit') }}" class="btn btn-primary">{{ t('admin_audit_logs', default='View Audit Logs') }}</a>
-        <a href="{{ url_for('admin.manage_feedback') }}" class="btn btn-primary">{{ t('admin_manage_feedback', default='Manage Feedback') }}</a>
-        <a href="{{ url_for('admin.view_waitlist') }}" class="btn btn-primary">{{ t('admin_view_waitlist', default='View Waitlist') }}</a>
-        <a href="{{ url_for('kyc.admin') }}" class="btn btn-primary">{{ t('admin_manage_kyc', default='Manage KYC Submissions') }}</a>
+    
+    <!-- User Management Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="text-muted">{{ t('admin_user_management', default='User Management') }}</h4>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_users') }}" class="btn btn-primary w-100">{{ t('admin_manage_users', default='Manage Users') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_user_roles') }}" class="btn btn-primary w-100">{{ t('admin_manage_user_roles', default='Manage User Roles') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_user_subscriptions') }}" class="btn btn-primary w-100">{{ t('admin_manage_user_subscriptions', default='Manage User Subscriptions') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_user_trials') }}" class="btn btn-success w-100">{{ t('admin_manage_user_trials', default='Manage User Trials') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.bulk_operations') }}" class="btn btn-warning w-100">{{ t('admin_bulk_operations', default='Bulk Operations') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_receipts') }}" class="btn btn-info w-100">{{ t('admin_manage_receipts', default='Manage Payment Receipts') }}</a>
+        </div>
+    </div>
+
+    <!-- Data Management Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="text-muted">{{ t('admin_data_management', default='Data Management') }}</h4>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_debtors') }}" class="btn btn-primary w-100">{{ t('admin_manage_debtors', default='Manage Debtors') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_creditors') }}" class="btn btn-primary w-100">{{ t('admin_manage_creditors', default='Manage Creditors') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_funds') }}" class="btn btn-primary w-100">{{ t('admin_manage_funds', default='Manage Funds') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_records') }}" class="btn btn-primary w-100">{{ t('admin_manage_records', default='Manage Income Records') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_cashflows') }}" class="btn btn-primary w-100">{{ t('admin_manage_cashflows', default='Manage Payment Outflows') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_kyc') }}" class="btn btn-secondary w-100">{{ t('admin_manage_kyc', default='Manage KYC Submissions') }}</a>
+        </div>
+    </div>
+
+    <!-- Reports & Analytics Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="text-muted">{{ t('admin_reports_analytics', default='Reports & Analytics') }}</h4>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.customer_reports') }}" class="btn btn-success w-100">{{ t('admin_customer_reports', default='Customer Reports') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.investor_reports') }}" class="btn btn-success w-100">{{ t('admin_investor_reports', default='Investor Reports') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_forecasts') }}" class="btn btn-success w-100">{{ t('admin_forecasts', default='Financial Forecasts') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.analytics_dashboard') }}" class="btn btn-info w-100">{{ t('admin_analytics_dashboard', default='Analytics Dashboard') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.enhanced_analytics_dashboard') }}" class="btn btn-info w-100">{{ t('admin_enhanced_analytics', default='Enhanced Analytics') }}</a>
+        </div>
+    </div>
+
+    <!-- System Management Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="text-muted">{{ t('admin_system_management', default='System Management') }}</h4>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.system_settings') }}" class="btn btn-dark w-100">{{ t('admin_system_settings', default='System Settings') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.system_health_monitor') }}" class="btn btn-dark w-100">{{ t('admin_system_health', default='System Health Monitor') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.audit') }}" class="btn btn-secondary w-100">{{ t('admin_audit_logs', default='View Audit Logs') }}</a>
+        </div>
+    </div>
+
+    <!-- Tax & Configuration Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="text-muted">{{ t('admin_tax_config', default='Tax & Configuration') }}</h4>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.tax_config') }}" class="btn btn-warning w-100">{{ t('admin_tax_config', default='Tax Configuration') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_tax_rates') }}" class="btn btn-warning w-100">{{ t('admin_tax_rates', default='Manage Tax Rates') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_tax_bands') }}" class="btn btn-warning w-100">{{ t('admin_tax_bands', default='Manage Tax Bands') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_tax_exemptions') }}" class="btn btn-warning w-100">{{ t('admin_tax_exemptions', default='Manage Tax Exemptions') }}</a>
+        </div>
+    </div>
+
+    <!-- Other Management Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="text-muted">{{ t('admin_other_management', default='Other Management') }}</h4>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.manage_feedback') }}" class="btn btn-secondary w-100">{{ t('admin_manage_feedback', default='Manage Feedback') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.view_waitlist') }}" class="btn btn-secondary w-100">{{ t('admin_view_waitlist', default='View Waitlist') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.export_waitlist') }}" class="btn btn-outline-secondary w-100">{{ t('admin_export_waitlist', default='Export Waitlist') }}</a>
+        </div>
+        <div class="col-md-4 mb-2">
+            <a href="{{ url_for('admin.education_management') }}" class="btn btn-info w-100">{{ t('admin_education_management', default='Education Management') }}</a>
+        </div>
+    </div>
     </div>
 
     <h2 class="mt-4">{{ t('admin_recent_users', default='Recent Users') }}</h2>
