@@ -1,0 +1,240 @@
+# Education Section Translations
+
+EDUCATION_TRANSLATIONS = {
+    'en': {
+        # Navigation and General
+        'tax_education': 'Tax Education',
+        'tax_education_desc': 'Learn about Nigerian tax laws and compliance',
+        'tax_education_tooltip': 'Access comprehensive tax education modules',
+        'education_title': 'Tax Education Center',
+        'education_center': 'Tax Education Center',
+        'welcome_education': 'Welcome to Tax Education',
+        'education_intro': 'Learn about Nigerian tax laws and compliance requirements tailored to your specific situation. Select your user type below to get started with personalized learning modules.',
+        
+        # User Types
+        'select_user_type': 'Select Your User Type',
+        'user_type_employee': 'Employee',
+        'user_type_employee_desc': 'I work for someone else and receive a salary',
+        'user_type_entrepreneur': 'Entrepreneur (Unregistered)',
+        'user_type_entrepreneur_desc': 'I run a business but haven\'t registered it formally',
+        'user_type_sole_proprietor': 'Sole Proprietor (Business Name)',
+        'user_type_sole_proprietor_desc': 'I have a registered business name but not a company',
+        'user_type_company': 'Company (Limited Liability)',
+        'user_type_company_desc': 'I have a registered limited liability company',
+        
+        # Module Titles
+        'module_tax_types_title': 'Understanding Tax Types',
+        'module_tax_types_desc': 'Learn which taxes apply to your situation under the Nigeria Tax Act 2025',
+        'module_paye_title': 'PAYE Basics for Employees',
+        'module_paye_desc': 'Understanding how PAYE works and your rights as an employee',
+        'module_formalization_title': 'Benefits of Business Formalization',
+        'module_formalization_desc': 'Why registering your business is important and beneficial',
+        'module_presumptive_title': 'Presumptive Tax Option',
+        'module_presumptive_desc': 'Alternative to detailed record-keeping for small businesses',
+        'module_deductions_title': 'Deductions & Reliefs',
+        'module_deductions_desc': 'Legal ways to reduce your tax liability',
+        'module_next_steps_title': 'Next Steps',
+        'module_next_steps_desc': 'Practical steps to ensure tax compliance',
+        
+        # Tax Types Content
+        'pit_title': 'Personal Income Tax (PIT)',
+        'pit_content': 'Applies to individuals and sole proprietors. Under NTA 2025, individuals earning ₦800,000 or less per year are exempt from PIT.',
+        'pit_point1': '₦800,000 annual exemption threshold',
+        'pit_point2': 'Applies to sole proprietors and individuals',
+        'pit_point3': 'Progressive tax rates from 15% to 25%',
+        
+        'paye_title': 'Pay-As-You-Earn (PAYE)',
+        'paye_content': 'Tax deducted by employers from employee salaries. Your employer handles the calculation and remittance.',
+        'paye_point1': 'Automatically deducted by employers',
+        'paye_point2': 'Based on your salary and allowances',
+        'paye_point3': 'Includes pension and NHIS contributions',
+        
+        'cit_title': 'Companies Income Tax (CIT)',
+        'cit_content': 'Applies to registered companies. Small companies with turnover ≤ ₦50 million AND fixed assets < ₦250 million pay 0% CIT under NTA 2025.',
+        'cit_point1': '0% rate for small companies (NTA 2025 criteria)',
+        'cit_point2': 'Turnover ≤ ₦50 million AND fixed assets < ₦250 million',
+        'cit_point3': 'Must still file returns even if no tax is due',
+        
+        # Glossary
+        'tax_glossary': 'Tax Glossary',
+        'glossary_intro': 'Understanding tax terminology is crucial for compliance. Here are key terms you\'ll encounter in Nigerian tax law.',
+        'search_glossary': 'Search glossary terms...',
+        'glossary_assessable_income': 'Assessable Income',
+        'glossary_assessable_income_def': 'Total income from all sources before deductions and reliefs',
+        'glossary_taxable_profit': 'Taxable Profit',
+        'glossary_taxable_profit_def': 'Business profit after deducting allowable expenses and reliefs',
+        'glossary_allowable_expenses': 'Allowable Expenses',
+        'glossary_allowable_expenses_def': 'Business expenses that can be deducted from income for tax purposes',
+        'glossary_presumptive_tax': 'Presumptive Tax',
+        'glossary_presumptive_tax_def': 'Simplified tax system based on estimated income rather than actual records',
+        'glossary_tin': 'Tax Identification Number (TIN)',
+        'glossary_tin_def': 'Unique number assigned to taxpayers for identification and tracking',
+        'glossary_paye': 'Pay-As-You-Earn (PAYE)',
+        'glossary_paye_def': 'Tax deducted from employee salaries by employers',
+        'glossary_pit': 'Personal Income Tax (PIT)',
+        'glossary_pit_def': 'Tax on income earned by individuals and sole proprietors',
+        'glossary_cit': 'Companies Income Tax (CIT)',
+        'glossary_cit_def': 'Tax on profits earned by registered companies',
+        
+        # New NTA/NTAA Terms
+        'development_levy_title': 'Development Levy',
+        'development_levy_content': 'New 4% Development Levy applies to companies above the small company threshold under NTA 2025.',
+        'dev_levy_point1': '4% levy on companies above ₦50 million turnover',
+        'dev_levy_point2': 'Applies when fixed assets ≥ ₦250 million',
+        'dev_levy_point3': 'New requirement under NTA 2025',
+        
+        'vat_threshold_title': 'VAT Registration Threshold',
+        'vat_threshold_content': 'Under NTAA 2025, businesses with turnover ≤ ₦100 million are exempt from VAT registration.',
+        'vat_point1': '₦100 million threshold under NTAA 2025',
+        'vat_point2': 'Separate from CIT small company definition',
+        'vat_point3': 'No VAT registration or filing required below threshold',
+        
+        'nta_vs_ntaa_title': 'NTA vs NTAA: Understanding the Difference',
+        'nta_vs_ntaa_content': 'Two separate acts govern different aspects of taxation with different thresholds.',
+        'nta_ntaa_point1': 'NTA 2025: ₦50 million threshold for CIT exemption',
+        'nta_ntaa_point2': 'NTAA 2025: ₦100 million threshold for VAT exemption',
+        'nta_ntaa_point3': 'Different acts, different purposes, different thresholds',
+        'nta_ntaa_point4': 'Both must be considered for full compliance',
+        
+        # Updated Expense Deductibility
+        'business_expenses_content': 'Under NTA 2025, expenses that are wholly and exclusively incurred for business purposes are deductible. The "reasonable" and "necessary" tests have been removed.',
+        'categorization_content': 'Proper categorization using the "wholly and exclusively" test simplifies tax filing.',
+        'categorization_point2': 'Apply "wholly and exclusively" test',
+        
+        # New Glossary Terms
+        'glossary_development_levy': 'Development Levy',
+        'glossary_development_levy_def': '4% levy on companies above ₦50 million turnover under NTA 2025',
+        'glossary_nta': 'Nigeria Tax Act (NTA) 2025',
+        'glossary_nta_def': 'Governs CIT, PIT, and Development Levy with ₦50 million small company threshold',
+        'glossary_ntaa': 'Nigeria Tax Administration Act (NTAA) 2025',
+        'glossary_ntaa_def': 'Governs VAT and tax administration with ₦100 million small business threshold',
+        'glossary_wholly_exclusively': 'Wholly and Exclusively Test',
+        'glossary_wholly_exclusively_def': 'NTA 2025 standard for deductible expenses - removes "reasonable" and "necessary" tests',
+        
+        # Navigation
+        'back_to_home': 'Back to Home',
+        'back_to_education': 'Back to Education',
+        'modules': 'modules',
+        'learning_path': 'Your Learning Path',
+        'education_modules': 'Education Modules',
+        'education_for': 'Tax Education for',
+        'estimated_time': '5-10 min read',
+        'learning_tips': 'Learning Tips',
+        'tip1': 'Start with "Understanding Tax Types" to get familiar with basic concepts',
+        'tip2': 'Take notes as you go through each module',
+        'tip3': 'Use the glossary to understand technical terms',
+        'tip4': 'Apply what you learn to your actual business situation',
+        
+        # Progress and Completion
+        'learning_progress': 'Learning Progress',
+        'modules_viewed': 'Modules Viewed',
+        'completion_rate': 'Completion Rate',
+        'total_modules': 'Total Modules',
+        'overall_progress': 'Overall Progress',
+        'progress_description': 'You have completed',
+        'out_of': 'out of',
+        'available_modules': 'available modules',
+        'module_history': 'Module History',
+        'module': 'Module',
+        'last_viewed': 'Last Viewed',
+        'total_views': 'Total Views',
+        'status': 'Status',
+        'actions': 'Actions',
+        'never': 'Never',
+        'completed': 'Completed',
+        'in_progress': 'In Progress',
+        'view': 'View',
+        'no_progress_yet': 'No Progress Yet',
+        'start_learning_message': 'You haven\'t started any modules yet. Begin your tax education journey today!',
+        'start_learning': 'Start Learning',
+        'mark_complete': 'Mark Complete',
+        'complete_module': 'Complete This Module',
+        'module_completed': 'Module completed successfully!',
+        
+        # Search
+        'search_education': 'Search Education',
+        'search_placeholder': 'Search for tax topics, terms, or concepts...',
+        'search': 'Search',
+        'search_results_for': 'Search Results for',
+        'results_found': 'results found',
+        'no_results': 'No Results Found',
+        'no_results_message': 'We couldn\'t find any content matching your search. Try:',
+        'search_tip1': 'Using different keywords',
+        'search_tip2': 'Checking your spelling',
+        'search_tip3': 'Using more general terms',
+        'search_tip4': 'Browsing our education modules directly',
+        'search_help': 'Search Help',
+        'search_help_text': 'Use the search box above to find specific tax topics, terms, or concepts. You can search through:',
+        'search_modules': 'Education modules and their content',
+        'search_glossary': 'Tax glossary terms and definitions',
+        'search_sections': 'Specific sections within modules',
+        'search_examples': 'Try searching for terms like "PIT", "deductions", "filing", or "TIN registration".',
+        'popular_topics': 'Popular Topics',
+        
+        # Common Actions
+        'learn_more': 'Learn More',
+        'view_glossary': 'View Glossary',
+        'view_progress': 'View Progress',
+        'browse_modules': 'Browse Modules',
+        'continue_learning': 'Continue Learning',
+        'practice_calculations': 'Practice Calculations',
+        'find_topics': 'Find Specific Topics',
+        'try_tax_calculator': 'Try Tax Calculator',
+        'calculate_tax': 'Calculate Tax',
+        'register_tin': 'Register for TIN',
+        'visit_firs_portal': 'Visit FIRS Portal',
+        'firs_website': 'FIRS Website',
+        
+        # Error Messages
+        'invalid_user_type': 'Invalid user type selected',
+        'module_not_found': 'Module not found',
+        'error_loading_progress': 'Error loading progress',
+        
+        # Key Points and Content
+        'key_points': 'Key Points:',
+        'practical_tip': 'Practical Tip',
+        'need_more_help': 'Need More Help?',
+        'glossary_help_text': 'If you can\'t find a term you\'re looking for, or need more detailed explanations, here are some resources:',
+        
+        # Category Guidance
+        'not_sure': 'Not Sure Which Category You Fit?',
+        'category_help': 'Here\'s a quick guide to help you choose:',
+        'employee_guide': 'Employee:',
+        'employee_guide_desc': 'You receive a monthly salary and your employer deducts tax from your pay',
+        'entrepreneur_guide': 'Entrepreneur (Unregistered):',
+        'entrepreneur_guide_desc': 'You run a business but haven\'t registered it with CAC',
+        'sole_proprietor_guide': 'Sole Proprietor:',
+        'sole_proprietor_guide_desc': 'You have a registered business name but not a limited company',
+        'company_guide': 'Company:',
+        'company_guide_desc': 'You have a registered limited liability company (Ltd/PLC)',
+        
+        # Browse and View Actions
+        'browse_all_modules': 'Browse All Modules',
+        'browse_modules_desc': 'Explore all available education modules',
+        'view_all': 'View All',
+        'search_topics': 'Search Topics',
+        'search_desc': 'Find specific tax topics and information',
+        'search_now': 'Search Now',
+        
+        # Learning Tips Extended
+        'tip_consistent': 'Set aside time for consistent learning',
+        'tip_notes': 'Take notes while reading modules',
+        'tip_practice': 'Apply concepts to your business',
+        'tip_calculator': 'Use the tax calculator to practice',
+        'tip_glossary': 'Reference the glossary for terms',
+        'tip_complete': 'Mark modules as complete when finished'
+    },
+    'ha': {
+        # Basic translations in Hausa - you can expand these
+        'tax_education': 'Ilimin Haraji',
+        'education_title': 'Cibiyar Ilimin Haraji',
+        'select_user_type': 'Zaɓi Nau\'in Mai Amfani da Kai',
+        'modules': 'sashe',
+        'learn_more': 'Koyi Ƙari',
+        'search': 'Bincike',
+        'back_to_home': 'Koma Gida',
+        'completed': 'An Kammala',
+        'in_progress': 'Ana Ci Gaba',
+        'view': 'Duba'
+    }
+}
