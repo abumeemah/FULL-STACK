@@ -40,6 +40,7 @@ try:
     from .general_features.general_translations import GENERAL_TRANSLATIONS
     from .general_features.admin_translations import ADMIN_TRANSLATIONS
     from .general_features.tax_translations import TAX_TRANSLATIONS
+    from .general_features.education_translations import EDUCATION_TRANSLATIONS
     
 except ImportError as e:
     logger.error(f"Failed to import translation module: {str(e)}", exc_info=True)
@@ -57,6 +58,7 @@ translation_modules = {
     # General Features
     'general': GENERAL_TRANSLATIONS,
     'tax': TAX_TRANSLATIONS,
+    'education': EDUCATION_TRANSLATIONS,
 }
 
 # Map key prefixes to module names
@@ -71,6 +73,7 @@ KEY_PREFIX_TO_MODULE = {
     # General Features prefixes
     'general_': 'general',
     'tax_': 'tax',
+    'education_': 'education',
 }
 
 # General-specific keys without prefixes (common navigation and UI elements)

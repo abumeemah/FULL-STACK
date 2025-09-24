@@ -1,18 +1,14 @@
-# Education Section Translations
-
 EDUCATION_TRANSLATIONS = {
     'en': {
-        # Navigation and General
-        'tax_education': 'Tax Education',
-        'tax_education_desc': 'Learn about Nigerian tax laws and compliance',
-        'tax_education_tooltip': 'Access comprehensive tax education modules',
+        # Main education section
         'education_title': 'Tax Education Center',
-        'education_center': 'Tax Education Center',
-        'welcome_education': 'Welcome to Tax Education',
-        'education_intro': 'Learn about Nigerian tax laws and compliance requirements tailored to your specific situation. Select your user type below to get started with personalized learning modules.',
+        'education_for': 'Tax Education for',
+        'education_modules': 'Education Modules',
+        'learning_path': 'Your Learning Path',
+        'learning_tips': 'Learning Tips',
+        'learning_progress': 'Learning Progress',
         
-        # User Types
-        'select_user_type': 'Select Your User Type',
+        # User types
         'user_type_employee': 'Employee',
         'user_type_employee_desc': 'I work for someone else and receive a salary',
         'user_type_entrepreneur': 'Entrepreneur (Unregistered)',
@@ -22,7 +18,18 @@ EDUCATION_TRANSLATIONS = {
         'user_type_company': 'Company (Limited Liability)',
         'user_type_company_desc': 'I have a registered limited liability company',
         
-        # Module Titles
+        # Navigation
+        'back_to_home': 'Back to Home',
+        'back_to_education': 'Back to Education',
+        'estimated_time': '5-10 min read',
+        
+        # Learning tips
+        'tip1': 'Start with "Understanding Tax Types" to get familiar with basic concepts',
+        'tip2': 'Take notes as you go through each module',
+        'tip3': 'Use the glossary to understand technical terms',
+        'tip4': 'Apply what you learn to your actual business situation',
+        
+        # Module titles and descriptions
         'module_tax_types_title': 'Understanding Tax Types',
         'module_tax_types_desc': 'Learn which taxes apply to your situation under the Nigeria Tax Act 2025',
         'module_paye_title': 'PAYE Basics for Employees',
@@ -35,8 +42,16 @@ EDUCATION_TRANSLATIONS = {
         'module_deductions_desc': 'Legal ways to reduce your tax liability',
         'module_next_steps_title': 'Next Steps',
         'module_next_steps_desc': 'Practical steps to ensure tax compliance',
+        'module_cit_title': 'Companies Income Tax Requirements',
+        'module_cit_desc': 'Understanding CIT obligations for limited liability companies',
+        'module_pit_title': 'Personal Income Tax Requirements',
+        'module_pit_desc': 'Understanding PIT obligations for sole proprietors',
+        'module_filing_title': 'Filing vs. Paying Tax',
+        'module_filing_desc': 'Understanding the difference between filing returns and paying tax',
+        'module_tracking_title': 'Tracking for Compliance',
+        'module_tracking_desc': 'How proper record-keeping supports tax compliance',
         
-        # Tax Types Content
+        # Tax types content
         'pit_title': 'Personal Income Tax (PIT)',
         'pit_content': 'Applies to individuals and sole proprietors. Under NTA 2025, individuals earning ₦800,000 or less per year are exempt from PIT.',
         'pit_point1': '₦800,000 annual exemption threshold',
@@ -50,15 +65,154 @@ EDUCATION_TRANSLATIONS = {
         'paye_point3': 'Includes pension and NHIS contributions',
         
         'cit_title': 'Companies Income Tax (CIT)',
-        'cit_content': 'Applies to registered companies. Small companies with turnover ≤ ₦50 million AND fixed assets < ₦250 million pay 0% CIT under NTA 2025.',
+        'cit_content': 'Applies to registered companies. Small companies with turnover ≤ ₦50 million AND total fixed assets < ₦250 million pay 0% CIT under NTA 2025.',
         'cit_point1': '0% rate for small companies (NTA 2025 criteria)',
         'cit_point2': 'Turnover ≤ ₦50 million AND fixed assets < ₦250 million',
         'cit_point3': 'Must still file returns even if no tax is due',
         
-        # Glossary
+        'development_levy_title': 'Development Levy',
+        'development_levy_content': 'New 4% Development Levy applies to companies above the small company threshold under NTA 2025.',
+        'dev_levy_point1': '4% levy on companies above ₦50 million turnover',
+        'dev_levy_point2': 'Applies when fixed assets ≥ ₦250 million',
+        'dev_levy_point3': 'New requirement under NTA 2025',
+        
+        'vat_threshold_title': 'VAT Registration Threshold',
+        'vat_threshold_content': 'Under NTAA 2025, businesses with turnover ≤ ₦100 million are exempt from VAT registration.',
+        'vat_point1': '₦100 million threshold under NTAA 2025',
+        'vat_point2': 'Separate from CIT small company definition',
+        'vat_point3': 'No VAT registration or filing required below threshold',
+        
+        # PAYE basics content
+        'paye_how_title': 'How PAYE Works',
+        'paye_how_content': 'Your employer calculates and deducts tax from your salary based on current tax rates and your total income.',
+        'paye_how_point1': 'Calculated monthly on cumulative basis',
+        'paye_how_point2': 'Includes basic salary and taxable allowances',
+        'paye_how_point3': 'Employer remits to FIRS on your behalf',
+        
+        'employee_reliefs_title': 'Available Reliefs',
+        'employee_reliefs_content': 'As an employee, you\'re entitled to various reliefs that reduce your taxable income.',
+        'employee_relief_point1': 'Pension contributions (minimum 8% of basic salary)',
+        'employee_relief_point2': 'NHIS contributions',
+        'employee_relief_point3': 'Life assurance premiums',
+        'employee_relief_point4': 'Rent relief: 20% of annual rent or ₦500,000 (whichever is lower)',
+        
+        # Formalization benefits
+        'legal_protection_title': 'Legal Protection',
+        'legal_protection_content': 'Formal registration provides legal protection and credibility for your business.',
+        'legal_point1': 'Protection of business name',
+        'legal_point2': 'Access to formal banking services',
+        'legal_point3': 'Ability to enter into contracts',
+        'legal_point4': 'Limited liability protection (for companies)',
+        
+        'tax_benefits_title': 'Tax Benefits',
+        'tax_benefits_content': 'Formal businesses can access various tax incentives and reliefs.',
+        'tax_benefit_point1': 'Access to tax reliefs and deductions',
+        'tax_benefit_point2': 'Ability to claim business expenses',
+        'tax_benefit_point3': 'Eligibility for government incentives',
+        'tax_benefit_point4': 'Simplified tax compliance options',
+        
+        # Presumptive tax
+        'presumptive_what_title': 'What is Presumptive Tax?',
+        'presumptive_what_content': 'A simplified tax system where tax is calculated based on estimated income rather than detailed records.',
+        'presumptive_point1': 'Based on business type and location',
+        'presumptive_point2': 'No need for detailed bookkeeping',
+        'presumptive_point3': 'Fixed annual amount',
+        'presumptive_point4': 'Suitable for small informal businesses',
+        
+        # Deductions and reliefs
+        'business_expenses_title': 'Allowable Business Expenses',
+        'business_expenses_content': 'Under NTA 2025, expenses that are wholly and exclusively incurred for business purposes are deductible. The "reasonable" and "necessary" tests have been removed.',
+        'business_exp_point1': 'Office rent and utilities',
+        'business_exp_point2': 'Staff salaries and benefits',
+        'business_exp_point3': 'Marketing and advertising costs',
+        'business_exp_point4': 'Professional fees and licenses',
+        
+        'personal_reliefs_title': 'Personal Reliefs',
+        'personal_reliefs_content': 'Reliefs available to reduce your taxable income.',
+        'personal_relief_point1': 'Pension contributions',
+        'personal_relief_point2': 'NHIS contributions',
+        'personal_relief_point3': 'Life assurance premiums',
+        'personal_relief_point4': 'Rent relief: 20% of annual rent or ₦500,000',
+        
+        # Next steps
+        'tin_registration_title': 'TIN Registration',
+        'tin_registration_content': 'Tax Identification Number is mandatory for all taxable individuals and businesses.',
+        'tin_point1': 'Linked to your National Identification Number (NIN)',
+        'tin_point2': 'Required for opening business bank accounts',
+        'tin_point3': 'Needed for government contracts and services',
+        'tin_point4': 'Free registration through FIRS portal',
+        
+        # CIT requirements
+        'cit_rates_title': 'CIT Rates Under NTA 2025',
+        'cit_rates_content': 'New favorable rates for small companies with specific criteria under NTA 2025.',
+        'cit_rates_point1': '0% CIT for small companies under NTA 2025',
+        'cit_rates_point2': 'Criteria: Turnover ≤ ₦50 million AND fixed assets < ₦250 million',
+        'cit_rates_point3': '4% Development Levy applies above threshold',
+        'cit_rates_point4': 'Standard CIT rate for larger companies',
+        
+        'nta_vs_ntaa_title': 'NTA vs NTAA: Understanding the Difference',
+        'nta_vs_ntaa_content': 'Two separate acts govern different aspects of taxation with different thresholds.',
+        'nta_ntaa_point1': 'NTA 2025: ₦50 million threshold for CIT exemption',
+        'nta_ntaa_point2': 'NTAA 2025: ₦100 million threshold for VAT exemption',
+        'nta_ntaa_point3': 'Different acts, different purposes, different thresholds',
+        'nta_ntaa_point4': 'Both must be considered for full compliance',
+        
+        'cit_compliance_title': 'Compliance Requirements',
+        'cit_compliance_content': 'Companies must maintain proper records and file annual returns regardless of tax liability.',
+        'cit_compliance_point1': 'Annual filing by June 30th',
+        'cit_compliance_point2': 'Quarterly advance payments (if applicable)',
+        'cit_compliance_point3': 'Audited financial statements (for larger companies)',
+        'cit_compliance_point4': 'Development Levy filing for companies above threshold',
+        
+        # PIT requirements
+        'pit_calc_title': 'How PIT is Calculated',
+        'pit_calc_content': 'PIT is calculated on your net business profit after allowable deductions under NTA 2025.',
+        'pit_calc_point1': 'Based on annual business profit',
+        'pit_calc_point2': 'Progressive rates: 15%, 18%, 21%, 23%, 25%',
+        'pit_calc_point3': '₦800,000 exemption threshold under NTA 2025',
+        'pit_calc_point4': 'Allowable business expenses reduce taxable income',
+        
+        'pit_filing_title': 'Filing Requirements',
+        'pit_filing_content': 'Annual filing is required even if no tax is due under NTA 2025.',
+        'pit_filing_point1': 'File by March 31st each year',
+        'pit_filing_point2': 'Required even if income is below ₦800,000',
+        'pit_filing_point3': 'Use FIRS online portal',
+        'pit_filing_point4': 'Keep records for at least 6 years',
+        
+        # Filing vs paying
+        'why_file_title': 'Why Filing is Required',
+        'why_file_content': 'Filing tax returns is mandatory under both NTA and NTAA 2025, even when no tax is due.',
+        'why_file_point1': 'Legal requirement under tax law',
+        'why_file_point2': 'Maintains good standing with FIRS',
+        'why_file_point3': 'Required for accessing government services',
+        'why_file_point4': 'Enables claiming of reliefs and exemptions',
+        
+        'consequences_title': 'Consequences of Non-Filing',
+        'consequences_content': 'Failure to file can result in penalties and assessments under both acts.',
+        'consequences_point1': 'Penalties and interest charges',
+        'consequences_point2': 'FIRS may make estimated assessments',
+        'consequences_point3': 'Difficulty accessing loans and contracts',
+        'consequences_point4': 'Potential audit and investigation',
+        
+        # Tracking for compliance
+        'digital_records_title': 'Digital Record Keeping',
+        'digital_records_content': 'Modern tools make it easier to maintain accurate business records for compliance.',
+        'digital_point1': 'Automatic categorization of expenses',
+        'digital_point2': 'Digital receipts and invoices',
+        'digital_point3': 'Real-time financial reporting',
+        'digital_point4': 'Audit trail for all transactions',
+        
+        'categorization_title': 'Expense Categorization',
+        'categorization_content': 'Proper categorization using the "wholly and exclusively" test simplifies tax filing.',
+        'categorization_point1': 'Separate business and personal expenses',
+        'categorization_point2': 'Apply "wholly and exclusively" test',
+        'categorization_point3': 'Maintain supporting documentation',
+        'categorization_point4': 'Regular reconciliation and review',
+        
+        # Glossary terms
         'tax_glossary': 'Tax Glossary',
-        'glossary_intro': 'Understanding tax terminology is crucial for compliance. Here are key terms you\'ll encounter in Nigerian tax law.',
-        'search_glossary': 'Search glossary terms...',
+        'glossary': 'Tax Glossary',
+        'view_glossary': 'View Glossary',
         'glossary_assessable_income': 'Assessable Income',
         'glossary_assessable_income_def': 'Total income from all sources before deductions and reliefs',
         'glossary_taxable_profit': 'Taxable Profit',
@@ -75,33 +229,6 @@ EDUCATION_TRANSLATIONS = {
         'glossary_pit_def': 'Tax on income earned by individuals and sole proprietors',
         'glossary_cit': 'Companies Income Tax (CIT)',
         'glossary_cit_def': 'Tax on profits earned by registered companies',
-        
-        # New NTA/NTAA Terms
-        'development_levy_title': 'Development Levy',
-        'development_levy_content': 'New 4% Development Levy applies to companies above the small company threshold under NTA 2025.',
-        'dev_levy_point1': '4% levy on companies above ₦50 million turnover',
-        'dev_levy_point2': 'Applies when fixed assets ≥ ₦250 million',
-        'dev_levy_point3': 'New requirement under NTA 2025',
-        
-        'vat_threshold_title': 'VAT Registration Threshold',
-        'vat_threshold_content': 'Under NTAA 2025, businesses with turnover ≤ ₦100 million are exempt from VAT registration.',
-        'vat_point1': '₦100 million threshold under NTAA 2025',
-        'vat_point2': 'Separate from CIT small company definition',
-        'vat_point3': 'No VAT registration or filing required below threshold',
-        
-        'nta_vs_ntaa_title': 'NTA vs NTAA: Understanding the Difference',
-        'nta_vs_ntaa_content': 'Two separate acts govern different aspects of taxation with different thresholds.',
-        'nta_ntaa_point1': 'NTA 2025: ₦50 million threshold for CIT exemption',
-        'nta_ntaa_point2': 'NTAA 2025: ₦100 million threshold for VAT exemption',
-        'nta_ntaa_point3': 'Different acts, different purposes, different thresholds',
-        'nta_ntaa_point4': 'Both must be considered for full compliance',
-        
-        # Updated Expense Deductibility
-        'business_expenses_content': 'Under NTA 2025, expenses that are wholly and exclusively incurred for business purposes are deductible. The "reasonable" and "necessary" tests have been removed.',
-        'categorization_content': 'Proper categorization using the "wholly and exclusively" test simplifies tax filing.',
-        'categorization_point2': 'Apply "wholly and exclusively" test',
-        
-        # New Glossary Terms
         'glossary_development_levy': 'Development Levy',
         'glossary_development_levy_def': '4% levy on companies above ₦50 million turnover under NTA 2025',
         'glossary_nta': 'Nigeria Tax Act (NTA) 2025',
@@ -111,50 +238,10 @@ EDUCATION_TRANSLATIONS = {
         'glossary_wholly_exclusively': 'Wholly and Exclusively Test',
         'glossary_wholly_exclusively_def': 'NTA 2025 standard for deductible expenses - removes "reasonable" and "necessary" tests',
         
-        # Navigation
-        'back_to_home': 'Back to Home',
-        'back_to_education': 'Back to Education',
-        'modules': 'modules',
-        'learning_path': 'Your Learning Path',
-        'education_modules': 'Education Modules',
-        'education_for': 'Tax Education for',
-        'estimated_time': '5-10 min read',
-        'learning_tips': 'Learning Tips',
-        'tip1': 'Start with "Understanding Tax Types" to get familiar with basic concepts',
-        'tip2': 'Take notes as you go through each module',
-        'tip3': 'Use the glossary to understand technical terms',
-        'tip4': 'Apply what you learn to your actual business situation',
-        
-        # Progress and Completion
-        'learning_progress': 'Learning Progress',
-        'modules_viewed': 'Modules Viewed',
-        'completion_rate': 'Completion Rate',
-        'total_modules': 'Total Modules',
-        'overall_progress': 'Overall Progress',
-        'progress_description': 'You have completed',
-        'out_of': 'out of',
-        'available_modules': 'available modules',
-        'module_history': 'Module History',
-        'module': 'Module',
-        'last_viewed': 'Last Viewed',
-        'total_views': 'Total Views',
-        'status': 'Status',
-        'actions': 'Actions',
-        'never': 'Never',
-        'completed': 'Completed',
-        'in_progress': 'In Progress',
-        'view': 'View',
-        'no_progress_yet': 'No Progress Yet',
-        'start_learning_message': 'You haven\'t started any modules yet. Begin your tax education journey today!',
-        'start_learning': 'Start Learning',
-        'mark_complete': 'Mark Complete',
-        'complete_module': 'Complete This Module',
-        'module_completed': 'Module completed successfully!',
-        
-        # Search
+        # Search functionality
         'search_education': 'Search Education',
-        'search_placeholder': 'Search for tax topics, terms, or concepts...',
         'search': 'Search',
+        'search_placeholder': 'Search for tax topics, terms, or concepts...',
         'search_results_for': 'Search Results for',
         'results_found': 'results found',
         'no_results': 'No Results Found',
@@ -171,70 +258,297 @@ EDUCATION_TRANSLATIONS = {
         'search_examples': 'Try searching for terms like "PIT", "deductions", "filing", or "TIN registration".',
         'popular_topics': 'Popular Topics',
         
-        # Common Actions
-        'learn_more': 'Learn More',
-        'view_glossary': 'View Glossary',
+        # Progress tracking
+        'progress': 'Your Progress',
         'view_progress': 'View Progress',
-        'browse_modules': 'Browse Modules',
-        'continue_learning': 'Continue Learning',
-        'practice_calculations': 'Practice Calculations',
-        'find_topics': 'Find Specific Topics',
-        'try_tax_calculator': 'Try Tax Calculator',
-        'calculate_tax': 'Calculate Tax',
-        'register_tin': 'Register for TIN',
-        'visit_firs_portal': 'Visit FIRS Portal',
-        'firs_website': 'FIRS Website',
-        
-        # Error Messages
-        'invalid_user_type': 'Invalid user type selected',
-        'module_not_found': 'Module not found',
         'error_loading_progress': 'Error loading progress',
         
-        # Key Points and Content
-        'key_points': 'Key Points:',
-        'practical_tip': 'Practical Tip',
-        'need_more_help': 'Need More Help?',
-        'glossary_help_text': 'If you can\'t find a term you\'re looking for, or need more detailed explanations, here are some resources:',
+        # Quick links
+        'tax_calculator': 'Tax Calculator',
+        'calculate_tax': 'Calculate Tax',
+        'tax_types': 'Tax Types',
+        'deductions': 'Deductions',
+        'filing': 'Filing',
+        'tin_registration': 'TIN Registration',
         
-        # Category Guidance
-        'not_sure': 'Not Sure Which Category You Fit?',
-        'category_help': 'Here\'s a quick guide to help you choose:',
-        'employee_guide': 'Employee:',
-        'employee_guide_desc': 'You receive a monthly salary and your employer deducts tax from your pay',
-        'entrepreneur_guide': 'Entrepreneur (Unregistered):',
-        'entrepreneur_guide_desc': 'You run a business but haven\'t registered it with CAC',
-        'sole_proprietor_guide': 'Sole Proprietor:',
-        'sole_proprietor_guide_desc': 'You have a registered business name but not a limited company',
-        'company_guide': 'Company:',
-        'company_guide_desc': 'You have a registered limited liability company (Ltd/PLC)',
-        
-        # Browse and View Actions
-        'browse_all_modules': 'Browse All Modules',
-        'browse_modules_desc': 'Explore all available education modules',
-        'view_all': 'View All',
-        'search_topics': 'Search Topics',
-        'search_desc': 'Find specific tax topics and information',
-        'search_now': 'Search Now',
-        
-        # Learning Tips Extended
-        'tip_consistent': 'Set aside time for consistent learning',
-        'tip_notes': 'Take notes while reading modules',
-        'tip_practice': 'Apply concepts to your business',
-        'tip_calculator': 'Use the tax calculator to practice',
-        'tip_glossary': 'Reference the glossary for terms',
-        'tip_complete': 'Mark modules as complete when finished'
+        # Error messages
+        'invalid_user_type': 'Invalid user type selected',
+        'module_not_found': 'Module not found',
     },
     'ha': {
-        # Basic translations in Hausa - you can expand these
-        'tax_education': 'Ilimin Haraji',
+        # Main education section
         'education_title': 'Cibiyar Ilimin Haraji',
-        'select_user_type': 'Zaɓi Nau\'in Mai Amfani da Kai',
-        'modules': 'sashe',
-        'learn_more': 'Koyi Ƙari',
-        'search': 'Bincike',
-        'back_to_home': 'Koma Gida',
-        'completed': 'An Kammala',
-        'in_progress': 'Ana Ci Gaba',
-        'view': 'Duba'
+        'education_for': 'Ilimin Haraji don',
+        'education_modules': 'Sassan Ilimi',
+        'learning_path': 'Hanyar Koyon ku',
+        'learning_tips': 'Shawarwarin Koyo',
+        'learning_progress': 'Ci gaban Koyo',
+        
+        # User types
+        'user_type_employee': 'Ma\'aikaci',
+        'user_type_employee_desc': 'Ina aiki ga wani kuma ina karɓar albashi',
+        'user_type_entrepreneur': 'Dan Kasuwa (Ba a Rijista ba)',
+        'user_type_entrepreneur_desc': 'Ina gudanar da kasuwanci amma ban rijista shi ba',
+        'user_type_sole_proprietor': 'Mai Kasuwanci (Sunan Kasuwanci)',
+        'user_type_sole_proprietor_desc': 'Ina da sunan kasuwanci da aka rijista amma ba kamfani ba',
+        'user_type_company': 'Kamfani (Limited Liability)',
+        'user_type_company_desc': 'Ina da kamfani mai iyakanceccen alhakin da aka rijista',
+        
+        # Navigation
+        'back_to_home': 'Komawa Gida',
+        'back_to_education': 'Komawa Ilimi',
+        'estimated_time': 'Mintuna 5-10 na karatu',
+        
+        # Learning tips
+        'tip1': 'Fara da "Fahimtar Nau\'ikan Haraji" don sanin mahimman ra\'ayoyi',
+        'tip2': 'Rubuta bayanai yayin da kuke bi kowane sashe',
+        'tip3': 'Yi amfani da ƙamus don fahimtar kalmomin fasaha',
+        'tip4': 'Yi amfani da abin da kuka koya a halin kasuwancin ku na gaske',
+        
+        # Module titles and descriptions
+        'module_tax_types_title': 'Fahimtar Nau\'ikan Haraji',
+        'module_tax_types_desc': 'Koyi waɗanne haraji suke shafar yanayin ku a ƙarƙashin Dokar Haraji ta Najeriya 2025',
+        'module_paye_title': 'Mahimman PAYE don Ma\'aikata',
+        'module_paye_desc': 'Fahimtar yadda PAYE ke aiki da haƙƙoƙin ku a matsayin ma\'aikaci',
+        'module_formalization_title': 'Fa\'idodin Tsarin Kasuwanci',
+        'module_formalization_desc': 'Me yasa rijista kasuwancin ku yana da muhimmanci da fa\'ida',
+        'module_presumptive_title': 'Zaɓin Haraji na Presumptive',
+        'module_presumptive_desc': 'Madadin yin cikakken rikodin kasuwanci don ƙananan kasuwanci',
+        'module_deductions_title': 'Ragewa da Sauƙaƙa',
+        'module_deductions_desc': 'Hanyoyin doka don rage harajin da kuke biya',
+        'module_next_steps_title': 'Matakan Gaba',
+        'module_next_steps_desc': 'Matakan aiki don tabbatar da bin dokar haraji',
+        'module_cit_title': 'Buƙatun Harajin Kamfanoni',
+        'module_cit_desc': 'Fahimtar wajibcin CIT don kamfanoni masu iyakanceccen alhakin',
+        'module_pit_title': 'Buƙatun Harajin Mutane',
+        'module_pit_desc': 'Fahimtar wajibcin PIT don masu kasuwanci guda ɗaya',
+        'module_filing_title': 'Shigar da Takarda da Biyan Haraji',
+        'module_filing_desc': 'Fahimtar bambanci tsakanin shigar da takardun haraji da biyan haraji',
+        'module_tracking_title': 'Bi diddigin don Bin Doka',
+        'module_tracking_desc': 'Yadda rikodin da ya dace ke tallafawa bin dokar haraji',
+        
+        # Tax types content
+        'pit_title': 'Harajin Mutane (PIT)',
+        'pit_content': 'Ya shafi mutane da masu kasuwanci guda ɗaya. A ƙarƙashin NTA 2025, mutanen da ke samun ₦800,000 ko ƙasa a shekara ba sa biyan PIT.',
+        'pit_point1': 'Matsayin keɓantawa na ₦800,000 a shekara',
+        'pit_point2': 'Ya shafi masu kasuwanci guda ɗaya da mutane',
+        'pit_point3': 'Adadin haraji mai ci gaba daga 15% zuwa 25%',
+        
+        'paye_title': 'Biya-Yayin-da-Kuke-Samu (PAYE)',
+        'paye_content': 'Harajin da ma\'aikata ke cire daga albashin ma\'aikata. Ma\'aikacin ku yana gudanar da ƙididdigewa da aikawa.',
+        'paye_point1': 'Ana cire shi ta atomatik ta ma\'aikata',
+        'paye_point2': 'Dangane da albashin ku da allowances',
+        'paye_point3': 'Ya haɗa da gudummawar fansho da NHIS',
+        
+        'cit_title': 'Harajin Kamfanoni (CIT)',
+        'cit_content': 'Ya shafi kamfanoni da aka rijista. Ƙananan kamfanoni da yawan kuɗi ≤ ₦50 miliyan KUMA jimillar kadarori < ₦250 miliyan suna biyan 0% CIT a ƙarƙashin NTA 2025.',
+        'cit_point1': 'Adadin 0% don ƙananan kamfanoni (ma\'aunin NTA 2025)',
+        'cit_point2': 'Yawan kuɗi ≤ ₦50 miliyan KUMA kadarori < ₦250 miliyan',
+        'cit_point3': 'Dole ne har yanzu su shigar da takardun haraji ko da babu harajin da za a biya',
+        
+        'development_levy_title': 'Harajin Ci gaba',
+        'development_levy_content': 'Sabon Harajin Ci gaba na 4% ya shafi kamfanoni sama da ƙaramin matsayin kamfani a ƙarƙashin NTA 2025.',
+        'dev_levy_point1': 'Haraji na 4% akan kamfanoni sama da yawan kuɗi na ₦50 miliyan',
+        'dev_levy_point2': 'Ya shafi lokacin da kadarori ≥ ₦250 miliyan',
+        'dev_levy_point3': 'Sabon buƙatu a ƙarƙashin NTA 2025',
+        
+        'vat_threshold_title': 'Matsayin Rijista VAT',
+        'vat_threshold_content': 'A ƙarƙashin NTAA 2025, kasuwanci da yawan kuɗi ≤ ₦100 miliyan ba sa buƙatar rijista VAT.',
+        'vat_point1': 'Matsayin ₦100 miliyan a ƙarƙashin NTAA 2025',
+        'vat_point2': 'Daban da ma\'anar ƙaramin kamfani na CIT',
+        'vat_point3': 'Babu buƙatar rijista VAT ko shigar da takarda a ƙasan matsayin',
+        
+        # PAYE basics content
+        'paye_how_title': 'Yadda PAYE ke Aiki',
+        'paye_how_content': 'Ma\'aikacin ku yana ƙididdigewa da cire haraji daga albashin ku dangane da adadin haraji na yanzu da jimillar kuɗin ku.',
+        'paye_how_point1': 'Ana ƙididdigewa kowane wata akan tushen tara',
+        'paye_how_point2': 'Ya haɗa da ainihin albashi da allowances masu haraji',
+        'paye_how_point3': 'Ma\'aikaci yana aikawa zuwa FIRS a madadin ku',
+        
+        'employee_reliefs_title': 'Sauƙaƙan da Ake Samu',
+        'employee_reliefs_content': 'A matsayin ma\'aikaci, kuna da \'yancin samun sauƙaƙa daban-daban waɗanda ke rage kuɗin harajin ku.',
+        'employee_relief_point1': 'Gudummawar fansho (mafi ƙarancin 8% na ainihin albashi)',
+        'employee_relief_point2': 'Gudummawar NHIS',
+        'employee_relief_point3': 'Kuɗin inshorar rayuwa',
+        'employee_relief_point4': 'Sauƙaƙar haya: 20% na shekara-shekara ko ₦500,000 (duk wanda ya fi ƙanƙanta)',
+        
+        # Formalization benefits
+        'legal_protection_title': 'Kariyar Doka',
+        'legal_protection_content': 'Rijista na yau da kullun yana ba da kariyar doka da aminci ga kasuwancin ku.',
+        'legal_point1': 'Kariyar sunan kasuwanci',
+        'legal_point2': 'Samun damar ayyukan banki na yau da kullun',
+        'legal_point3': 'Ikon shiga kwangila',
+        'legal_point4': 'Kariyar iyakanceccen alhakin (don kamfanoni)',
+        
+        'tax_benefits_title': 'Fa\'idodin Haraji',
+        'tax_benefits_content': 'Kasuwanci na yau da kullun na iya samun ƙarfafawa da sauƙaƙa daban-daban na haraji.',
+        'tax_benefit_point1': 'Samun damar sauƙaƙa da ragewa na haraji',
+        'tax_benefit_point2': 'Ikon neman kuɗaɗen kasuwanci',
+        'tax_benefit_point3': 'Cancantar samun ƙarfafawar gwamnati',
+        'tax_benefit_point4': 'Zaɓuɓɓukan sauƙin bin dokar haraji',
+        
+        # Presumptive tax
+        'presumptive_what_title': 'Menene Harajin Presumptive?',
+        'presumptive_what_content': 'Tsarin haraji mai sauƙi inda ana ƙididdigewa haraji dangane da ƙididdigar kuɗi maimakon cikakken rikodin.',
+        'presumptive_point1': 'Dangane da nau\'in kasuwanci da wuri',
+        'presumptive_point2': 'Babu buƙatar cikakken rikodin kasuwanci',
+        'presumptive_point3': 'Adadin shekara-shekara mai ƙayyadaddun',
+        'presumptive_point4': 'Ya dace da ƙananan kasuwanci marasa tsari',
+        
+        # Deductions and reliefs
+        'business_expenses_title': 'Kuɗaɗen Kasuwanci da Aka Yarda',
+        'business_expenses_content': 'A ƙarƙashin NTA 2025, kuɗaɗen da aka kashe gaba ɗaya kuma na musamman don dalilai na kasuwanci ana iya rage su. An cire gwajin "mai hankali" da "mai buƙata".',
+        'business_exp_point1': 'Hayar ofis da kayan aiki',
+        'business_exp_point2': 'Albashin ma\'aikata da fa\'idodi',
+        'business_exp_point3': 'Kuɗaɗen tallace-tallace da talla',
+        'business_exp_point4': 'Kuɗaɗen ƙwararru da lasisi',
+        
+        'personal_reliefs_title': 'Sauƙaƙan Mutum',
+        'personal_reliefs_content': 'Sauƙaƙa da ake samu don rage kuɗin harajin ku.',
+        'personal_relief_point1': 'Gudummawar fansho',
+        'personal_relief_point2': 'Gudummawar NHIS',
+        'personal_relief_point3': 'Kuɗin inshorar rayuwa',
+        'personal_relief_point4': 'Sauƙaƙar haya: 20% na shekara-shekara ko ₦500,000',
+        
+        # Next steps
+        'tin_registration_title': 'Rijista TIN',
+        'tin_registration_content': 'Lambar Gano Haraji wajibi ne ga duk mutane da kasuwanci masu biyan haraji.',
+        'tin_point1': 'An haɗa shi da Lambar Gano ƙasa (NIN)',
+        'tin_point2': 'Ana buƙata don buɗe asusun banki na kasuwanci',
+        'tin_point3': 'Ana buƙata don kwangilar gwamnati da ayyuka',
+        'tin_point4': 'Rijista kyauta ta hanyar portal na FIRS',
+        
+        # CIT requirements
+        'cit_rates_title': 'Adadin CIT A ƙarƙashin NTA 2025',
+        'cit_rates_content': 'Sabbin adadin da suka fi dacewa don ƙananan kamfanoni da takamaiman ma\'auni a ƙarƙashin NTA 2025.',
+        'cit_rates_point1': '0% CIT don ƙananan kamfanoni a ƙarƙashin NTA 2025',
+        'cit_rates_point2': 'Ma\'auni: Yawan kuɗi ≤ ₦50 miliyan KUMA kadarori < ₦250 miliyan',
+        'cit_rates_point3': 'Harajin Ci gaba na 4% ya shafi sama da matsayin',
+        'cit_rates_point4': 'Daidaitaccen adadin CIT don manyan kamfanoni',
+        
+        'nta_vs_ntaa_title': 'NTA da NTAA: Fahimtar Bambanci',
+        'nta_vs_ntaa_content': 'Dokoki biyu daban-daban suna gudanar da fannoni daban-daban na haraji da matsayi daban-daban.',
+        'nta_ntaa_point1': 'NTA 2025: Matsayin ₦50 miliyan don keɓancewar CIT',
+        'nta_ntaa_point2': 'NTAA 2025: Matsayin ₦100 miliyan don keɓancewar VAT',
+        'nta_ntaa_point3': 'Dokoki daban-daban, dalilai daban-daban, matsayi daban-daban',
+        'nta_ntaa_point4': 'Dole ne a yi la\'akari da su biyu don cikakken bin doka',
+        
+        'cit_compliance_title': 'Buƙatun Bin Doka',
+        'cit_compliance_content': 'Kamfanoni dole su kula da ingantattun bayanai kuma su shigar da takardun shekara-shekara ba tare da la\'akari da alhakin haraji ba.',
+        'cit_compliance_point1': 'Shigar da takarda na shekara-shekara kafin Yuni 30',
+        'cit_compliance_point2': 'Biyan gaba na kwata-kwata (idan ya shafa)',
+        'cit_compliance_point3': 'Takardun kuɗi da aka bincika (don manyan kamfanoni)',
+        'cit_compliance_point4': 'Shigar da takardun Harajin Ci gaba don kamfanoni sama da matsayin',
+        
+        # PIT requirements
+        'pit_calc_title': 'Yadda Ake Ƙididdigewa PIT',
+        'pit_calc_content': 'Ana ƙididdigewa PIT akan ribar kasuwancin ku bayan rage kuɗaɗen da aka yarda a ƙarƙashin NTA 2025.',
+        'pit_calc_point1': 'Dangane da ribar kasuwanci na shekara-shekara',
+        'pit_calc_point2': 'Adadin ci gaba: 15%, 18%, 21%, 23%, 25%',
+        'pit_calc_point3': 'Matsayin keɓantawa na ₦800,000 a ƙarƙashin NTA 2025',
+        'pit_calc_point4': 'Kuɗaɗen kasuwanci da aka yarda suna rage kuɗin haraji',
+        
+        'pit_filing_title': 'Buƙatun Shigar da Takarda',
+        'pit_filing_content': 'Shigar da takarda na shekara-shekara wajibi ne ko da babu harajin da za a biya a ƙarƙashin NTA 2025.',
+        'pit_filing_point1': 'Shigar da takarda kafin Maris 31 kowace shekara',
+        'pit_filing_point2': 'Wajibi ne ko da kuɗin ya ƙasa da ₦800,000',
+        'pit_filing_point3': 'Yi amfani da portal na FIRS na kan layi',
+        'pit_filing_point4': 'Ajiye bayanai aƙalla shekaru 6',
+        
+        # Filing vs paying
+        'why_file_title': 'Me yasa Shigar da Takarda Wajibi ne',
+        'why_file_content': 'Shigar da takardun haraji wajibi ne a ƙarƙashin NTA da NTAA 2025, ko da lokacin da babu harajin da za a biya.',
+        'why_file_point1': 'Buƙatu na doka a ƙarƙashin dokar haraji',
+        'why_file_point2': 'Yana kula da kyakkyawan matsayi tare da FIRS',
+        'why_file_point3': 'Ana buƙata don samun damar ayyukan gwamnati',
+        'why_file_point4': 'Yana ba da damar neman sauƙaƙa da keɓantawa',
+        
+        'consequences_title': 'Sakamakon Rashin Shigar da Takarda',
+        'consequences_content': 'Rashin shigar da takarda na iya haifar da hukunci da ƙima a ƙarƙashin dokoki biyu.',
+        'consequences_point1': 'Hukunci da kuɗin riba',
+        'consequences_point2': 'FIRS na iya yin ƙididdigar ƙima',
+        'consequences_point3': 'Wahalar samun lamuni da kwangila',
+        'consequences_point4': 'Yuwuwar bincike da bincike',
+        
+        # Tracking for compliance
+        'digital_records_title': 'Rikodin Dijital',
+        'digital_records_content': 'Kayan aikin zamani suna sauƙaƙa kula da ingantattun bayanan kasuwanci don bin doka.',
+        'digital_point1': 'Rarrabuwar kuɗaɗe ta atomatik',
+        'digital_point2': 'Rasit da daftarin aiki na dijital',
+        'digital_point3': 'Rahoton kuɗi na lokaci-lokaci',
+        'digital_point4': 'Hanyar bincike don duk ma\'amaloli',
+        
+        'categorization_title': 'Rarrabuwar Kuɗaɗe',
+        'categorization_content': 'Rarrabuwar da ta dace ta amfani da gwajin "gaba ɗaya kuma na musamman" yana sauƙaƙa shigar da takardun haraji.',
+        'categorization_point1': 'Raba kuɗaɗen kasuwanci da na mutum',
+        'categorization_point2': 'Yi amfani da gwajin "gaba ɗaya kuma na musamman"',
+        'categorization_point3': 'Kula da takaddun tallafi',
+        'categorization_point4': 'Daidaitawa da dubawa akai-akai',
+        
+        # Glossary terms
+        'tax_glossary': 'Ƙamus na Haraji',
+        'glossary': 'Ƙamus na Haraji',
+        'view_glossary': 'Duba Ƙamus',
+        'glossary_assessable_income': 'Kuɗin da Za a Ƙididdige',
+        'glossary_assessable_income_def': 'Jimillar kuɗi daga duk tushe kafin ragewa da sauƙaƙa',
+        'glossary_taxable_profit': 'Ribar da Za a Yi Haraji',
+        'glossary_taxable_profit_def': 'Ribar kasuwanci bayan rage kuɗaɗen da aka yarda da sauƙaƙa',
+        'glossary_allowable_expenses': 'Kuɗaɗen da Aka Yarda',
+        'glossary_allowable_expenses_def': 'Kuɗaɗen kasuwanci da za a iya rage daga kuɗi don dalilai na haraji',
+        'glossary_presumptive_tax': 'Harajin Presumptive',
+        'glossary_presumptive_tax_def': 'Tsarin haraji mai sauƙi dangane da ƙididdigar kuɗi maimakon ainihin bayanai',
+        'glossary_tin': 'Lambar Gano Haraji (TIN)',
+        'glossary_tin_def': 'Lambar musamman da aka ba wa masu biyan haraji don ganowa da bi diddigi',
+        'glossary_paye': 'Biya-Yayin-da-Kuke-Samu (PAYE)',
+        'glossary_paye_def': 'Harajin da ma\'aikata ke cire daga albashin ma\'aikata',
+        'glossary_pit': 'Harajin Mutane (PIT)',
+        'glossary_pit_def': 'Haraji akan kuɗin da mutane da masu kasuwanci guda ɗaya ke samu',
+        'glossary_cit': 'Harajin Kamfanoni (CIT)',
+        'glossary_cit_def': 'Haraji akan ribar da kamfanoni da aka rijista ke samu',
+        'glossary_development_levy': 'Harajin Ci gaba',
+        'glossary_development_levy_def': 'Haraji na 4% akan kamfanoni sama da yawan kuɗi na ₦50 miliyan a ƙarƙashin NTA 2025',
+        'glossary_nta': 'Dokar Haraji ta Najeriya (NTA) 2025',
+        'glossary_nta_def': 'Tana gudanar da CIT, PIT, da Harajin Ci gaba tare da matsayin ƙaramin kamfani na ₦50 miliyan',
+        'glossary_ntaa': 'Dokar Gudanar da Haraji ta Najeriya (NTAA) 2025',
+        'glossary_ntaa_def': 'Tana gudanar da VAT da gudanar da haraji tare da matsayin ƙaramin kasuwanci na ₦100 miliyan',
+        'glossary_wholly_exclusively': 'Gwajin Gaba Ɗaya kuma Na Musamman',
+        'glossary_wholly_exclusively_def': 'Ma\'aunin NTA 2025 don kuɗaɗen da za a rage - yana cire gwajin "mai hankali" da "mai buƙata"',
+        
+        # Search functionality
+        'search_education': 'Nemo Ilimi',
+        'search': 'Nemo',
+        'search_placeholder': 'Nemo batutuwan haraji, kalmomi, ko ra\'ayoyi...',
+        'search_results_for': 'Sakamakon Bincike don',
+        'results_found': 'sakamako da aka samu',
+        'no_results': 'Babu Sakamako da Aka Samu',
+        'no_results_message': 'Ba mu sami wani abun ciki da ya dace da binciken ku ba. Gwada:',
+        'search_tip1': 'Amfani da kalmomi daban-daban',
+        'search_tip2': 'Duba rubutun ku',
+        'search_tip3': 'Amfani da kalmomi masu yawa',
+        'search_tip4': 'Duba sassan iliminmu kai tsaye',
+        'search_help': 'Taimakon Bincike',
+        'search_help_text': 'Yi amfani da akwatin bincike a sama don nemo takamaiman batutuwan haraji, kalmomi, ko ra\'ayoyi. Kuna iya bincika ta:',
+        'search_modules': 'Sassan ilimi da abubuwan da ke ciki',
+        'search_glossary': 'Kalmomin ƙamus na haraji da ma\'anoni',
+        'search_sections': 'Sassan musamman a cikin sassan',
+        'search_examples': 'Gwada binciken kalmomi kamar "PIT", "ragewa", "shigar da takarda", ko "rijista TIN".',
+        'popular_topics': 'Batutuwa Masu Shahara',
+        
+        # Progress tracking
+        'progress': 'Ci gaban ku',
+        'view_progress': 'Duba Ci gaba',
+        'error_loading_progress': 'Kuskure wajen ɗaukar ci gaba',
+        
+        # Quick links
+        'tax_calculator': 'Na\'urar Ƙididdigewa Haraji',
+        'calculate_tax': 'Ƙididdigewa Haraji',
+        'tax_types': 'Nau\'ikan Haraji',
+        'deductions': 'Ragewa',
+        'filing': 'Shigar da Takarda',
+        'tin_registration': 'Rijista TIN',
+        
+        # Error messages
+        'invalid_user_type': 'An zaɓi nau\'in mai amfani mara inganci',
+        'module_not_found': 'Ba a sami sashe ba',
     }
 }
