@@ -11,7 +11,22 @@ TAX_TRANSLATIONS = {
         'taxable_income_label': 'Taxable Income',
         'estimated_tax_label': 'Estimated Tax Liability',
         'expense_categories_title': 'Expense Categories',
-        
+
+        'pit_title': 'Personal Income Tax (PIT)',
+        'pit_desc': 'Tax levied on an individual’s income',
+        'paye_title': 'Pay As You Earn (PAYE)',
+        'paye_desc': 'Tax deducted from employees’ salaries by employers',
+        'cit_title': 'Corporate Income Tax (CIT)',
+        'cit_desc': 'Tax on the profits of a company',
+        'vat_threshold_title': 'VAT Threshold',
+        'vat_threshold_desc': 'Minimum revenue requiring VAT registration',
+        'tax_benefits_title': 'Tax Benefits',
+        'tax_benefits_desc': 'Incentives and reliefs to reduce tax obligations',
+        'tax_benefit_point1': 'Tax relief for small businesses',
+        'tax_benefit_point2': 'Exemptions for certain income types',
+        'tax_benefit_point3': 'Incentives for investments in specific sectors',
+        'tax_benefit_point4': 'Deductions for charitable contributions',
+        'tax_benefit_point5': 'Reliefs for research and development expenses',
         # Expense Category Names
         'office_admin_cat': 'Office & Admin',
         'staff_wages_cat': 'Staff & Wages',
@@ -265,6 +280,22 @@ TAX_TRANSLATIONS = {
         'tax_information_title': 'Bayanan Haraji',
         'progressive_tax_rates_title': 'Kudaden Haraji masu Ci gaba (NTA 2025)',
         'rent_relief_title': 'Cirewar Kudin Haya',
+        # Tax Module
+        'pit_title': 'Harajin Kuɗin Shiga na Mutum (PIT)',
+        'pit_desc': 'Harajin da ake ɗaukakawa kan kuɗin shigar mutum',
+        'paye_title': 'Biya Yayin da Kake Samu (PAYE)',
+        'paye_desc': 'Harajin da ake cirewa daga albashin ma’aikata ta hannun mai ɗaukar aiki',
+        'cit_title': 'Harajin Kuɗin Shiga na Kamfani (CIT)',
+        'cit_desc': 'Harajin da ake ɗaukakawa kan ribar kamfani',
+        'vat_threshold_title': 'Ƙimar VAT',
+        'vat_threshold_desc': 'Mafi ƙarancin kuɗin shiga da ake buƙata don rajistar VAT',
+        'tax_benefits_title': 'Amfanin Haraji',
+        'tax_benefits_desc': 'Ƙarfafawa da sassauci don rage wajibcin haraji',
+        'tax_benefit_point1': 'Sassaucin haraji ga ƙananan kasuwanci',
+        'tax_benefit_point2': 'Keɓancewa ga wasu nau’ikan kuɗin shiga',
+        'tax_benefit_point3': 'Ƙarfafawa ga saka hannun jari a wasu sassa',
+        'tax_benefit_point4': 'Ragewa ga gudummawar sadaka',
+        'tax_benefit_point5': 'Sassauci ga kashe kuɗin bincike da ci gaba',
         'rent_relief_description': 'Kuna iya neman cirewar kudin haya daidai da mafi karanci tsakanin ₦500,000 ko kashi 20% na kudin haya na shekara.',
         'loading_text': 'Ana lodawa...',
         'calculating_tax_text': 'Ana kirgar haraji...',
@@ -278,4 +309,5 @@ TAX_TRANSLATIONS = {
         'business_travel_desc': 'Man fetur, gyaran mota, da kudin tafiye-tafiye na kasuwanci',
         'rent_utilities_desc': 'Kudin haya na shago ko ofishin kasuwanci (daban da Cirewar Kudin Haya)',
     }
+
 }
