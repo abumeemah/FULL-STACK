@@ -277,7 +277,7 @@ def create_app():
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
     # Add URL generation configurations
-    app.config['SERVER_NAME'] = os.getenv('SERVER_NAME', 'business.ficoreafrica.com')
+    app.config['SERVER_NAME'] = os.getenv('SERVER_NAME', 'ficore-labs-records.onrender.com')
     app.config['APPLICATION_ROOT'] = os.getenv('APPLICATION_ROOT', '/')
     app.config['PREFERRED_URL_SCHEME'] = os.getenv('PREFERRED_URL_SCHEME', 'https')
 
@@ -485,25 +485,18 @@ def create_app():
         if 'lang' not in session:
             session['lang'] = 'en'
 
-    # Redirect from onrender.com to custom domain
+    # Handle redirects for www and ficoreafrica.com
     @app.before_request
     def handle_redirects():
         host = request.host
-
-        # Redirect onrender.com to custom domain
-        if host.endswith("onrender.com"):
-            new_url = request.url.replace(host, "business.ficoreafrica.com")
-            return redirect(new_url, code=301)
-
         # Redirect www to root domain
         if host.startswith("www."):
             new_host = host[4:]
             new_url = request.url.replace(host, new_host)
             return redirect(new_url, code=301)
-
-        # Redirect ficoreafrica.com to business.ficoreafrica.com
+        # Redirect ficoreafrica.com to ficore-labs-records.onrender.com
         if host == 'ficoreafrica.com':
-            new_url = request.url.replace('ficoreafrica.com', 'business.ficoreafrica.com')
+            new_url = request.url.replace('ficoreafrica.com', 'ficore-labs-records.onrender.com')
             return redirect(new_url, code=301)
 
     app.jinja_env.globals.update(
