@@ -485,7 +485,7 @@ def create_app():
         if 'lang' not in session:
             session['lang'] = 'en'
 
-    # Handle redirects for www and ficoreafrica.com
+    # Handle redirects for www and ficore-labs-records.onrender.com
     @app.before_request
     def handle_redirects():
         host = request.host
@@ -494,9 +494,9 @@ def create_app():
             new_host = host[4:]
             new_url = request.url.replace(host, new_host)
             return redirect(new_url, code=301)
-        # Redirect ficoreafrica.com to ficore-labs-records.onrender.com
-        if host == 'ficoreafrica.com':
-            new_url = request.url.replace('ficoreafrica.com', 'ficore-labs-records.onrender.com')
+        # Redirect ficore-labs-records.onrender.com to ficore-labs-records.onrender.com
+        if host == 'ficore-labs-records.onrender.com':
+            new_url = request.url.replace('ficore-labs-records.onrender.com', 'ficore-labs-records.onrender.com')
             return redirect(new_url, code=301)
 
     app.jinja_env.globals.update(
