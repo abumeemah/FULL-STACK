@@ -3,7 +3,6 @@ import sys
 import logging
 from datetime import datetime, timedelta, timezone
 import uuid
-from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from flask import (
     Flask, jsonify, request, render_template, redirect, url_for, flash,
@@ -485,6 +484,20 @@ def create_app():
         if 'lang' not in session:
             session['lang'] = 'en'
 
+    # Handle redirects for www and ficoreafrica.com
+    @app.before_request
+    def handle_redirects():
+        host = request.host
+        # Redirect www to root domain
+        if host.startswith("www."):
+            new_host = host[4:]
+            new_url = request.url.replace(host, new_host)
+            return redirect(new_url, code=301)
+        # Redirect ficoreafrica.com to ficore-labs-records.onrender.com
+        if host == 'ficoreafrica.com':
+            new_url = request.url.replace('ficoreafrica.com', 'ficore-labs-records.onrender.com')
+            return redirect(new_url, code=301)
+
     app.jinja_env.globals.update(
         FACEBOOK_URL=app.config.get('FACEBOOK_URL', 'https://facebook.com/ficoreafrica'),
         TWITTER_URL=app.config.get('TWITTER_URL', 'https://x.com/ficoreafrica'),
@@ -573,7 +586,8 @@ def create_app():
             )
             if current_user.is_authenticated:
                 return redirect(get_post_login_redirect(current_user.role))
-            return redirect(url_for('general_bp.landing'))
+            # Render landing page directly to avoid potential redirect loop
+            return render_template('landing.html', title='Welcome to Ficore Labs')
         except Exception as e:
             current_app.logger.error(f"Error in root route: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
             flash(trans('general_error', default='An error occurred'), 'danger')
@@ -709,6 +723,6 @@ def create_app():
 app = create_app()
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 10000))
     logger.info(f'Starting Flask application on port {port}', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
     app.run(host='0.0.0.0', port=port, debug=os.getenv('FLASK_ENV', 'development') == 'development')
