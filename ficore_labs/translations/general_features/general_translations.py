@@ -595,7 +595,7 @@ GENERAL_TRANSLATIONS = {
         'view_data_no_records': 'No records found.',
         'view_data_cashflows': 'Cashflows',
         'view_data_no_cashflows': 'No cashflows found.',
-        'general_opens_new_window': '(opens in new window)',o We Serve',
+        'general_opens_new_window': '(opens in new window)',
         'general_who_we_serve_desc': 'Your Money, Your Terms',
         'general_our_tools': 'Our Tools',
         'general_tools_desc': 'Powerful tools to manage your finances effectively',
