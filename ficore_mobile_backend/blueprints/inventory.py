@@ -1,4 +1,4 @@
-Gfrom flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
 from bson import ObjectId
 
@@ -1798,5 +1798,6 @@ def init_inventory_blueprint(mongo, token_required, serialize_doc):
                 'message': 'Failed to generate movement history report',
                 'errors': {'general': [str(e)]}
             }), 500
+
 
     return inventory_bp
