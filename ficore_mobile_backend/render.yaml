@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: ficore-mobile-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: MONGO_URI
+        value: mongodb+srv://ficore_user:ficore_password@cluster0.mongodb.net/ficore_mobile?retryWrites=true&w=majority
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHONPATH
+        value: /opt/render/project/src
