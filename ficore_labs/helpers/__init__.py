@@ -1,1 +1,0 @@
-# Helpers package for FiCore Labs application
