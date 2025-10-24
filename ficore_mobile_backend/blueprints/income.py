@@ -4,7 +4,7 @@ from bson import ObjectId
 import csv
 import io
 from collections import defaultdict
-from ..utils.payment_utils import normalize_sales_type, validate_sales_type
+from utils.payment_utils import normalize_sales_type, validate_sales_type
 
 def init_income_blueprint(mongo, token_required, serialize_doc):
     """Initialize the income blueprint with database and auth decorator"""
@@ -753,3 +753,4 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
             }), 500
 
     return income_bp
+
