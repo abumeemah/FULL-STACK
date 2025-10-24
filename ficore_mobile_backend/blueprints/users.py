@@ -852,8 +852,8 @@ def update_financial_goals():
             }), 500
     
     return _update_financial_goals()
-@us
-ers_bp.route('/profile/complete', methods=['PUT'])
+
+@users_bp.route('/profile/complete', methods=['PUT'])
 def complete_profile():
     @users_bp.token_required
     def _complete_profile(current_user):
