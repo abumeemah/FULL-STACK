@@ -190,7 +190,7 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
             )
 
             # Check for streak milestone rewards
-            await _check_and_award_streak_milestones(mongo, current_user, current_streak, user)
+            _check_and_award_streak_milestones(mongo, current_user, current_streak, user)
 
             # Get updated user data (in case FC balance was updated)
             user = mongo.db.users.find_one({'_id': current_user['_id']})
@@ -275,7 +275,7 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
 
             # Check for exploration bonuses
             user = mongo.db.users.find_one({'_id': current_user['_id']})
-            await _check_and_award_exploration_bonuses(mongo, current_user, action, module, user)
+            _check_and_award_exploration_bonuses(mongo, current_user, action, module, user)
 
             return jsonify({
                 'success': True,
@@ -497,7 +497,7 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
             }), 500
 
     # Helper functions
-    async def _check_and_award_streak_milestones(mongo, current_user, streak, user):
+    def _check_and_award_streak_milestones(mongo, current_user, streak, user):
         """Check and award streak milestone bonuses"""
         try:
             for milestone, config in EARNING_CONFIG['streak_milestones'].items():
@@ -540,7 +540,7 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
         except Exception as e:
             print(f"Error awarding streak milestones: {str(e)}")
 
-    async def _check_and_award_exploration_bonuses(mongo, current_user, action, module, user):
+    def _check_and_award_exploration_bonuses(mongo, current_user, action, module, user):
         """Check and award exploration bonuses"""
         try:
             bonus_key = None
