@@ -8,8 +8,9 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: MONGO_URI
-        value: mongodb+srv://ficore_user:ficore_password@cluster0.mongodb.net/ficore_mobile?retryWrites=true&w=majority
+        value: 
       - key: FLASK_ENV
         value: production
       - key: PYTHONPATH
+
         value: /opt/render/project/src
