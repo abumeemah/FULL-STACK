@@ -852,3 +852,145 @@ def update_financial_goals():
             }), 500
     
     return _update_financial_goals()
+@us
+ers_bp.route('/profile/complete', methods=['PUT'])
+def complete_profile():
+    @users_bp.token_required
+    def _complete_profile(current_user):
+        try:
+            data = request.get_json()
+            
+            # Profile completion fields
+            profile_fields = [
+                'businessName', 'businessType', 'businessTypeOther', 'industry',
+                'physicalAddress', 'taxIdentificationNumber', 'profilePictureUrl',
+                'socialMediaLinks', 'numberOfEmployees'
+            ]
+            
+            update_data = {}
+            
+            # Update profile fields
+            for field in profile_fields:
+                if field in data:
+                    update_data[field] = data[field]
+            
+            # Calculate completion percentage
+            user = users_bp.mongo.db.users.find_one({'_id': current_user['_id']})
+            total_fields = len(profile_fields)
+            completed_fields = 0
+            
+            for field in profile_fields:
+                value = data.get(field) if field in data else user.get(field)
+                if value is not None and value != '' and value != {}:
+                    completed_fields += 1
+            
+            completion_percentage = (completed_fields / total_fields) * 100
+            update_data['profileCompletionPercentage'] = completion_percentage
+            update_data['updatedAt'] = datetime.utcnow()
+            
+            # Update user profile
+            users_bp.mongo.db.users.update_one(
+                {'_id': current_user['_id']},
+                {'$set': update_data}
+            )
+            
+            # Check if profile is sufficiently complete (at least 5 fields)
+            if completed_fields >= 5:
+                # Track profile completion activity for rewards
+                try:
+                    import requests
+                    from flask import current_app
+                    
+                    # Get auth token for internal API call
+                    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+                    
+                    # Call rewards tracking endpoint
+                    tracking_response = requests.post(
+                        f"{request.host_url}rewards/track-activity",
+                        headers={'Authorization': f'Bearer {token}'},
+                        json={
+                            'action': 'complete_profile',
+                            'module': 'profile'
+                        }
+                    )
+                    
+                    if tracking_response.status_code == 200:
+                        print("Profile completion activity tracked successfully")
+                    else:
+                        print(f"Failed to track profile completion: {tracking_response.text}")
+                        
+                except Exception as tracking_error:
+                    print(f"Error tracking profile completion: {str(tracking_error)}")
+                    # Don't fail the profile update if tracking fails
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'profileCompletionPercentage': completion_percentage,
+                    'completedFields': completed_fields,
+                    'totalFields': total_fields,
+                    'rewardEligible': completed_fields >= 5
+                },
+                'message': 'Profile updated successfully'
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to update profile',
+                'errors': {'general': [str(e)]}
+            }), 500
+    
+    return _complete_profile()
+
+@users_bp.route('/profile/completion-status', methods=['GET'])
+def get_profile_completion_status():
+    @users_bp.token_required
+    def _get_profile_completion_status(current_user):
+        try:
+            user = users_bp.mongo.db.users.find_one({'_id': current_user['_id']})
+            
+            # Profile completion fields
+            profile_fields = [
+                'businessName', 'businessType', 'industry',
+                'physicalAddress', 'taxIdentificationNumber', 'profilePictureUrl',
+                'socialMediaLinks', 'numberOfEmployees'
+            ]
+            
+            completed_fields = 0
+            field_status = {}
+            
+            for field in profile_fields:
+                value = user.get(field)
+                is_completed = value is not None and value != '' and value != {}
+                field_status[field] = {
+                    'completed': is_completed,
+                    'value': value if is_completed else None
+                }
+                if is_completed:
+                    completed_fields += 1
+            
+            total_fields = len(profile_fields)
+            completion_percentage = (completed_fields / total_fields) * 100
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'completionPercentage': completion_percentage,
+                    'completedFields': completed_fields,
+                    'totalFields': total_fields,
+                    'fieldStatus': field_status,
+                    'rewardEligible': completed_fields >= 5,
+                    'rewardClaimed': user.get('earned_profile_complete_bonus', False)
+                },
+                'message': 'Profile completion status retrieved successfully'
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve profile completion status',
+                'errors': {'general': [str(e)]}
+            }), 500
+    
+    return _get_profile_completion_status()

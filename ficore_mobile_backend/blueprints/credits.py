@@ -471,6 +471,28 @@ def init_credits_blueprint(mongo, token_required, serialize_doc):
                     'message': 'Amount must be greater than zero'
                 }), 400
 
+            # Validate operation is a known FC cost operation
+            valid_operations = [
+                # Income & Expense operations
+                'create_income', 'delete_income', 'create_expense', 'delete_expense',
+                # Inventory operations
+                'create_item', 'delete_item', 'create_movement', 'stock_in', 'stock_out', 'adjust_stock',
+                # Creditors operations
+                'create_vendor', 'delete_vendor', 'create_creditor_transaction', 'delete_creditor_transaction',
+                # Debtors operations
+                'create_customer', 'delete_customer', 'create_debtor_transaction', 'delete_debtor_transaction',
+                # Export operations
+                'export_inventory_csv', 'export_inventory_pdf', 'export_creditors_csv', 'export_creditors_pdf',
+                'export_debtors_csv', 'export_debtors_pdf', 'export_net_income_report', 'export_financial_report',
+                'export_dashboard_summary', 'export_enhanced_profit_report', 'export_complete_data_export',
+                'export_movements_csv', 'export_valuation_pdf', 'export_aging_report_pdf', 'export_payments_due_csv',
+                'export_debtors_aging_report_pdf', 'export_debtors_payments_due_csv'
+            ]
+            
+            if operation not in valid_operations:
+                print(f"Warning: Unknown operation '{operation}' for credit deduction")
+                # Don't fail, just log for monitoring
+
             # Get current user balance
             user = mongo.db.users.find_one({'_id': current_user['_id']})
             current_balance = user.get('ficoreCreditBalance', 0.0)
@@ -534,6 +556,97 @@ def init_credits_blueprint(mongo, token_required, serialize_doc):
             return jsonify({
                 'success': False,
                 'message': 'Failed to deduct credits',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @credits_bp.route('/award', methods=['POST'])
+    @token_required
+    def award_credits(current_user):
+        """Award credits to user account (for completing tasks like tax education)"""
+        try:
+            data = request.get_json()
+            
+            # Validate required fields
+            if 'amount' not in data or 'operation' not in data:
+                return jsonify({
+                    'success': False,
+                    'message': 'Missing required fields: amount, operation'
+                }), 400
+
+            amount = float(data['amount'])
+            operation = data['operation']
+            description = data.get('description', f'Credits earned from {operation}')
+
+            if amount <= 0:
+                return jsonify({
+                    'success': False,
+                    'message': 'Amount must be greater than zero'
+                }), 400
+
+            # Validate operation is a known credit-earning operation
+            valid_award_operations = [
+                'tax_education_progress',  # Users earn 1 FC per tax education module
+                'signup_bonus',           # Initial signup bonus
+                'referral_bonus',         # Future referral system
+                'admin_award'             # Manual admin awards
+            ]
+            
+            if operation not in valid_award_operations:
+                print(f"Warning: Unknown operation '{operation}' for credit award")
+                # Don't fail, just log for monitoring
+
+            # Get current user balance
+            user = mongo.db.users.find_one({'_id': current_user['_id']})
+            current_balance = user.get('ficoreCreditBalance', 0.0)
+
+            # Award credits to user account
+            new_balance = current_balance + amount
+            mongo.db.users.update_one(
+                {'_id': current_user['_id']},
+                {'$set': {'ficoreCreditBalance': new_balance}}
+            )
+
+            # Create transaction record
+            transaction = {
+                '_id': ObjectId(),
+                'userId': current_user['_id'],
+                'type': 'credit',
+                'amount': amount,
+                'description': description,
+                'operation': operation,
+                'balanceBefore': current_balance,
+                'balanceAfter': new_balance,
+                'status': 'completed',
+                'createdAt': datetime.utcnow(),
+                'metadata': {
+                    'operation': operation,
+                    'awardType': 'task_completion'
+                }
+            }
+            
+            mongo.db.credit_transactions.insert_one(transaction)
+
+            return jsonify({
+                'success': True,
+                'data': {
+                    'transactionId': str(transaction['_id']),
+                    'amountAwarded': amount,
+                    'previousBalance': current_balance,
+                    'newBalance': new_balance,
+                    'operation': operation
+                },
+                'message': f'Credits awarded successfully for {operation}'
+            })
+
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid amount format'
+            }), 400
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to award credits',
                 'errors': {'general': [str(e)]}
             }), 500
 
