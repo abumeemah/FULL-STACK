@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
 from bson import ObjectId
-from ..utils.payment_utils import normalize_payment_method, validate_payment_method
+from utils.payment_utils import normalize_payment_method, validate_payment_method
 
 expenses_bp = Blueprint('expenses', __name__, url_prefix='/expenses')
 
@@ -661,4 +661,5 @@ def get_expense_statistics():
                 'errors': {'general': [str(e)]}
             }), 500
     
+
     return _get_expense_statistics()
