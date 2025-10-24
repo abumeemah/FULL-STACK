@@ -643,8 +643,7 @@ def init_creditors_blueprint(mongo, token_required, serialize_doc):
                 'errors': {'general': [str(e)]}
             }), 500
 
-    return creditors_bp    @credi
-tors_bp.route('/transactions', methods=['GET'])
+    @creditors_bp.route('/transactions', methods=['GET'])
     @token_required
     def get_transactions(current_user):
         """Get all creditor transactions with pagination and filtering"""
