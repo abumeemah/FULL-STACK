@@ -189,11 +189,14 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
                 }
             )
 
-            # Check for streak milestone rewards
-            _check_and_award_streak_milestones(mongo, current_user, current_streak, user)
-
-            # Get updated user data (in case FC balance was updated)
-            user = mongo.db.users.find_one({'_id': current_user['_id']})
+            # Check for streak milestone rewards (with error handling)
+            try:
+                _check_and_award_streak_milestones(mongo, current_user, current_streak, user)
+                # Get updated user data (in case FC balance was updated)
+                user = mongo.db.users.find_one({'_id': current_user['_id']})
+            except Exception as e:
+                print(f"Error checking streak milestones: {str(e)}")
+                # Continue without failing the entire request
             
             # Calculate next milestone
             next_milestone = 7
@@ -204,11 +207,19 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
             elif current_streak >= 7:
                 next_milestone = 30
 
-            # Get active benefits
-            active_benefits = _get_active_benefits(user)
+            # Get active benefits (with error handling)
+            try:
+                active_benefits = _get_active_benefits(user)
+            except Exception as e:
+                print(f"Error getting active benefits: {str(e)}")
+                active_benefits = []
             
-            # Get earning opportunities (unclaimed bonuses)
-            earning_opportunities = _get_earning_opportunities(user)
+            # Get earning opportunities (with error handling)
+            try:
+                earning_opportunities = _get_earning_opportunities(user)
+            except Exception as e:
+                print(f"Error getting earning opportunities: {str(e)}")
+                earning_opportunities = []
 
             return jsonify({
                 'success': True,
@@ -497,6 +508,82 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
             }), 500
 
     # Helper functions
+    def _get_active_benefits(user):
+        """Get user's active benefits"""
+        try:
+            active_benefits = []
+            
+            # Check for temporary discount
+            if user.get('hasTemporaryDiscount', False):
+                discount_expires = user.get('tempDiscountExpires')
+                if discount_expires and datetime.utcnow() < discount_expires:
+                    active_benefits.append({
+                        'type': 'temp_discount',
+                        'name': '50% Off All FC Costs',
+                        'description': f"{user.get('discountPercentage', 50)}% discount on all features",
+                        'expires_at': discount_expires.isoformat() + 'Z' if discount_expires else None
+                    })
+            
+            # Check for free entries
+            if user.get('freeEntriesCount', 0) > 0:
+                active_benefits.append({
+                    'type': 'free_entries',
+                    'name': 'Free Income/Expense Entries',
+                    'description': f"{user.get('freeEntriesCount', 0)} free entries remaining",
+                    'count': user.get('freeEntriesCount', 0)
+                })
+            
+            # Check for free PDF exports
+            if user.get('hasFreePdfExports', False):
+                pdf_expires = user.get('freePdfExportsExpires')
+                if pdf_expires and datetime.utcnow() < pdf_expires:
+                    active_benefits.append({
+                        'type': 'free_pdf_exports',
+                        'name': 'Free PDF Exports',
+                        'description': 'Unlimited PDF exports',
+                        'expires_at': pdf_expires.isoformat() + 'Z' if pdf_expires else None
+                    })
+            
+            return active_benefits
+        except Exception as e:
+            print(f"Error getting active benefits: {str(e)}")
+            return []
+
+    def _get_earning_opportunities(user):
+        """Get available earning opportunities for the user"""
+        try:
+            opportunities = []
+            
+            # Check for unclaimed exploration bonuses
+            for bonus_key, config in EARNING_CONFIG['exploration_bonuses'].items():
+                if not user.get(config['flag'], False):
+                    opportunities.append({
+                        'type': 'exploration',
+                        'key': bonus_key,
+                        'name': bonus_key.replace('_', ' ').title(),
+                        'amount': config['amount'],
+                        'description': f"Earn {config['amount']} FCs by exploring this feature"
+                    })
+            
+            # Check for unclaimed streak milestones
+            current_streak = user.get('current_streak', 0)
+            for milestone, config in EARNING_CONFIG['streak_milestones'].items():
+                if current_streak < milestone and not user.get(config['flag'], False):
+                    days_needed = milestone - current_streak
+                    opportunities.append({
+                        'type': 'streak_milestone',
+                        'key': f'streak_{milestone}d',
+                        'name': f'{milestone}-Day Streak Milestone',
+                        'amount': config['amount'],
+                        'description': f"Earn {config['amount']} FCs by maintaining a {milestone}-day streak ({days_needed} more days needed)"
+                    })
+                    break  # Only show the next milestone
+            
+            return opportunities
+        except Exception as e:
+            print(f"Error getting earning opportunities: {str(e)}")
+            return []
+
     def _check_and_award_streak_milestones(mongo, current_user, streak, user):
         """Check and award streak milestone bonuses"""
         try:
