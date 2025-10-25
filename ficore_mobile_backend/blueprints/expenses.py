@@ -131,24 +131,8 @@ def create_expense():
                     'errors': errors
                 }), 400
             
-            # Check FiCore Credits balance
-            credit_cost = 1  # 1 FC per expense entry
-            user = expenses_bp.mongo.db.users.find_one({'_id': current_user['_id']})
-            current_balance = user.get('ficoreCreditBalance', 0.0)
-            
-            if current_balance < credit_cost:
-                return jsonify({
-                    'success': False,
-                    'message': 'Insufficient credits',
-                    'errors': {
-                        'credits': [f'You need {credit_cost} FC to add an expense. Current balance: {current_balance} FC']
-                    },
-                    'data': {
-                        'currentBalance': current_balance,
-                        'requiredAmount': credit_cost,
-                        'shortfall': credit_cost - current_balance
-                    }
-                }), 402  # Payment Required
+            # NOTE: Credit checking and deduction is handled by frontend executeWithCredits()
+            # No need to check/deduct credits here to avoid double deduction
             
             # Normalize and validate payment method if provided
             raw_payment = data.get('paymentMethod')
@@ -178,33 +162,8 @@ def create_expense():
             result = expenses_bp.mongo.db.expenses.insert_one(expense_data)
             expense_id = str(result.inserted_id)
             
-            # Deduct FiCore Credits
-            new_balance = current_balance - credit_cost
-            expenses_bp.mongo.db.users.update_one(
-                {'_id': current_user['_id']},
-                {'$set': {'ficoreCreditBalance': new_balance}}
-            )
-            
-            # Create transaction record
-            from bson import ObjectId as BsonObjectId
-            transaction = {
-                '_id': BsonObjectId(),
-                'userId': current_user['_id'],
-                'type': 'debit',
-                'amount': credit_cost,
-                'description': f'Expense entry: {expense_data["description"]}',
-                'operation': 'create_expense',
-                'balanceBefore': current_balance,
-                'balanceAfter': new_balance,
-                'status': 'completed',
-                'createdAt': datetime.utcnow(),
-                'metadata': {
-                    'operation': 'create_expense',
-                    'expenseId': expense_id,
-                    'deductionType': 'app_usage'
-                }
-            }
-            expenses_bp.mongo.db.creditTransactions.insert_one(transaction)
+            # NOTE: Credit deduction is handled by frontend executeWithCredits()
+            # to avoid double deduction
             
             return jsonify({
                 'success': True,
@@ -212,9 +171,7 @@ def create_expense():
                     'id': expense_id,
                     'amount': expense_data['amount'],
                     'description': expense_data['description'],
-                    'category': expense_data['category'],
-                    'creditBalance': new_balance,
-                    'creditsUsed': credit_cost
+                    'category': expense_data['category']
                 },
                 'message': 'Expense created successfully'
             })
