@@ -889,57 +889,12 @@ def init_tax_blueprint(mongo, token_required, serialize_doc):
                 result = mongo.db.tax_education_progress.insert_one(progress_data)
                 progress_id = str(result.inserted_id)
 
-            # Award FiCore Credits if module not already completed
-            credits_awarded = 0
-            if not (existing_progress and existing_progress.get('completed')):
-                # Define FiCore Credit rewards for each module (1 FC per module as requested)
-                module_rewards = {
-                    # Legacy modules (for backward compatibility)
-                    'pit_basics': 1,
-                    'deductible_expenses': 1,
-                    'statutory_contributions': 1,
-                    'tax_planning': 1,
-                    # Current 2025/2026 modules
-                    'nta_2025_overview': 1,
-                    'pit_basics_2026': 1,
-                    'employee_tax_guide': 1,
-                    'entrepreneur_tax_guide': 1,
-                    'deductible_expenses_entrepreneurs': 1,
-                    'employee_benefits_taxation': 1,
-                    'statutory_contributions_2026': 1,
-                    'rent_relief_2026': 1,
-                    'filing_requirements': 1,
-                    'penalties_compliance': 1,
-                    'tax_planning_2026': 1,
-                    'calculator_guide_2026': 1
-                }
-                credits_awarded = module_rewards.get(module_id, 1)  # Default to 1 FC if module not in list
-                
-                if credits_awarded > 0:
-                    # Update user's FiCore Credit balance
-                    mongo.db.users.update_one(
-                        {'_id': current_user['_id']},
-                        {'$inc': {'ficoreCreditBalance': credits_awarded}}
-                    )
-                    
-                    # Create CreditTransaction record for traceability
-                    from bson import ObjectId
-                    transaction_data = {
-                        '_id': ObjectId(),
-                        'userId': current_user['_id'],
-                        'amount': float(credits_awarded),
-                        'type': 'credit',
-                        'description': f'Tax Education Reward - {module_id.replace("_", " ").title()}',
-                        'status': 'completed',
-                        'action': 'tax_education_reward',
-                        'createdAt': datetime.utcnow(),
-                        'updatedAt': datetime.utcnow(),
-                        'metadata': {
-                            'source': 'tax_education',
-                            'moduleId': module_id
-                        }
-                    }
-                    mongo.db.creditTransactions.insert_one(transaction_data)
+            # Check if module was already completed (to prevent duplicate rewards)
+            already_completed = existing_progress and existing_progress.get('completed')
+            credits_awarded = 0 if already_completed else 1  # 1 FC per module, but only if not already completed
+            
+            # Note: Credit awarding is now handled by the FC cost system via /credits/award endpoint
+            # This endpoint only marks the module as complete
 
             return jsonify({
                 'success': True,
@@ -947,9 +902,9 @@ def init_tax_blueprint(mongo, token_required, serialize_doc):
                     'progress_id': progress_id,
                     'module_id': module_id,
                     'completed': True,
-                    'credits_awarded': credits_awarded
+                    'credits_will_be_awarded': credits_awarded
                 },
-                'message': f'Module completed successfully{" - " + str(credits_awarded) + " FiCore Credit" + ("s" if credits_awarded != 1 else "") + " awarded!" if credits_awarded > 0 else ""}'
+                'message': 'Module completed successfully!' + (' Credits will be awarded by the FC system.' if credits_awarded > 0 else ' Module was already completed.')
             })
 
         except Exception as e:

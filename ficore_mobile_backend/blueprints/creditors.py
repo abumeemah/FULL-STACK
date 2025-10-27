@@ -85,22 +85,27 @@ def init_creditors_blueprint(mongo, token_required, serialize_doc):
             else:
                 status = 'active'
             
-            # Update creditor record
-            mongo.db.creditors.update_one(
+            # 🛡️ ATOMIC UPDATE: Update creditor record with error handling
+            update_result = mongo.db.creditors.update_one(
                 {'_id': creditor_id},
                 {
                     '$set': {
-                        'totalOwed': total_owed,
-                        'paidAmount': paid_amount,
-                        'remainingOwed': remaining_owed,
+                        'totalOwed': float(total_owed),
+                        'paidAmount': float(paid_amount),
+                        'remainingOwed': float(remaining_owed),
                         'status': status,
                         'lastPaymentDate': last_transaction_date if paid_amount > 0 else None,
                         'nextPaymentDue': next_payment_due,
-                        'overdueDays': overdue_days,
+                        'overdueDays': int(overdue_days),
                         'updatedAt': datetime.utcnow()
                     }
                 }
             )
+            
+            # Verify update was successful
+            if update_result.modified_count == 0:
+                print(f"Warning: No creditor updated for ID {creditor_id}")
+                return False
             
             return True
             
@@ -159,7 +164,7 @@ def init_creditors_blueprint(mongo, token_required, serialize_doc):
                         'errors': {'customPaymentDays': ['Custom payment days must be greater than 0']}
                     }), 400
             
-            # Create vendor record
+            # 🛡️ CREATE VENDOR RECORD: Ensure all required fields are properly set
             vendor_data = {
                 '_id': ObjectId(),
                 'userId': current_user['_id'],
@@ -183,15 +188,65 @@ def init_creditors_blueprint(mongo, token_required, serialize_doc):
                 'updatedAt': datetime.utcnow()
             }
             
-            result = mongo.db.creditors.insert_one(vendor_data)
+            # 🛡️ VALIDATE DATA TYPES: Ensure numeric fields are properly typed
+            try:
+                if vendor_data['creditLimit'] is not None:
+                    vendor_data['creditLimit'] = float(vendor_data['creditLimit'])
+                if vendor_data['customPaymentDays'] is not None:
+                    vendor_data['customPaymentDays'] = int(vendor_data['customPaymentDays'])
+            except (ValueError, TypeError) as e:
+                return jsonify({
+                    'success': False,
+                    'message': 'Invalid numeric values provided',
+                    'errors': {'general': [f'Data type validation failed: {str(e)}']}
+                }), 400
             
-            # Return created vendor
+            # 🛡️ ATOMIC INSERT: Insert vendor with error handling
+            try:
+                result = mongo.db.creditors.insert_one(vendor_data)
+                if not result.inserted_id:
+                    return jsonify({
+                        'success': False,
+                        'message': 'Failed to create vendor in database',
+                        'errors': {'general': ['Database insertion failed']}
+                    }), 500
+            except Exception as db_error:
+                print(f"Database error during vendor creation: {str(db_error)}")
+                return jsonify({
+                    'success': False,
+                    'message': 'Database error occurred',
+                    'errors': {'general': [f'Database operation failed: {str(db_error)}']}
+                }), 500
+            
+            # Return created vendor with proper error handling
             created_vendor = mongo.db.creditors.find_one({'_id': result.inserted_id})
+            if not created_vendor:
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to retrieve created vendor',
+                    'errors': {'general': ['Vendor creation verification failed']}
+                }), 500
+            
             vendor_response = serialize_doc(created_vendor.copy())
             
-            # Format dates
+            # 🛡️ SAFE DATE FORMATTING: Handle dates properly
             vendor_response['createdAt'] = vendor_response.get('createdAt', datetime.utcnow()).isoformat() + 'Z'
             vendor_response['updatedAt'] = vendor_response.get('updatedAt', datetime.utcnow()).isoformat() + 'Z'
+            
+            # Safe formatting for optional date fields
+            last_payment = vendor_response.get('lastPaymentDate')
+            vendor_response['lastPaymentDate'] = last_payment.isoformat() + 'Z' if last_payment else None
+            
+            next_payment = vendor_response.get('nextPaymentDue')
+            vendor_response['nextPaymentDue'] = next_payment.isoformat() + 'Z' if next_payment else None
+            
+            # 🛡️ ENSURE DATA CONSISTENCY: Add required fields with defaults
+            vendor_response.setdefault('totalOwed', 0.0)
+            vendor_response.setdefault('paidAmount', 0.0)
+            vendor_response.setdefault('remainingOwed', 0.0)
+            vendor_response.setdefault('status', 'active')
+            vendor_response.setdefault('overdueDays', 0)
+            vendor_response.setdefault('tags', [])
             
             return jsonify({
                 'success': True,
@@ -234,15 +289,36 @@ def init_creditors_blueprint(mongo, token_required, serialize_doc):
             vendors = list(mongo.db.creditors.find(query).sort('vendorName', 1).skip(skip).limit(limit))
             total = mongo.db.creditors.count_documents(query)
             
-            # Serialize vendors
+            # Serialize vendors with proper error handling
             vendor_list = []
             for vendor in vendors:
-                vendor_data = serialize_doc(vendor.copy())
-                vendor_data['createdAt'] = vendor_data.get('createdAt', datetime.utcnow()).isoformat() + 'Z'
-                vendor_data['updatedAt'] = vendor_data.get('updatedAt', datetime.utcnow()).isoformat() + 'Z'
-                vendor_data['lastPaymentDate'] = vendor_data.get('lastPaymentDate').isoformat() + 'Z' if vendor_data.get('lastPaymentDate') else None
-                vendor_data['nextPaymentDue'] = vendor_data.get('nextPaymentDue').isoformat() + 'Z' if vendor_data.get('nextPaymentDue') else None
-                vendor_list.append(vendor_data)
+                try:
+                    vendor_data = serialize_doc(vendor.copy())
+                    
+                    # 🛡️ SAFE DATE FORMATTING: Handle None values properly
+                    vendor_data['createdAt'] = vendor_data.get('createdAt', datetime.utcnow()).isoformat() + 'Z'
+                    vendor_data['updatedAt'] = vendor_data.get('updatedAt', datetime.utcnow()).isoformat() + 'Z'
+                    
+                    # Safe date formatting for optional fields
+                    last_payment = vendor_data.get('lastPaymentDate')
+                    vendor_data['lastPaymentDate'] = last_payment.isoformat() + 'Z' if last_payment else None
+                    
+                    next_payment = vendor_data.get('nextPaymentDue')
+                    vendor_data['nextPaymentDue'] = next_payment.isoformat() + 'Z' if next_payment else None
+                    
+                    # 🛡️ ENSURE REQUIRED FIELDS: Add defaults for missing fields
+                    vendor_data.setdefault('totalOwed', 0.0)
+                    vendor_data.setdefault('paidAmount', 0.0)
+                    vendor_data.setdefault('remainingOwed', 0.0)
+                    vendor_data.setdefault('status', 'active')
+                    vendor_data.setdefault('overdueDays', 0)
+                    vendor_data.setdefault('tags', [])
+                    
+                    vendor_list.append(vendor_data)
+                except Exception as e:
+                    print(f"Error serializing vendor {vendor.get('_id', 'unknown')}: {str(e)}")
+                    # Skip problematic vendor but continue processing others
+                    continue
             
             return jsonify({
                 'success': True,
@@ -421,15 +497,35 @@ def init_creditors_blueprint(mongo, token_required, serialize_doc):
                 {'$set': update_data}
             )
             
-            # Get updated vendor
+            # Get updated vendor with verification
             updated_vendor = mongo.db.creditors.find_one({'_id': ObjectId(vendor_id)})
+            if not updated_vendor:
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to retrieve updated vendor',
+                    'errors': {'general': ['Vendor update verification failed']}
+                }), 500
+            
             vendor_response = serialize_doc(updated_vendor.copy())
             
-            # Format dates
+            # 🛡️ SAFE DATE FORMATTING: Handle dates properly
             vendor_response['createdAt'] = vendor_response.get('createdAt', datetime.utcnow()).isoformat() + 'Z'
             vendor_response['updatedAt'] = vendor_response.get('updatedAt', datetime.utcnow()).isoformat() + 'Z'
-            vendor_response['lastPaymentDate'] = vendor_response.get('lastPaymentDate').isoformat() + 'Z' if vendor_response.get('lastPaymentDate') else None
-            vendor_response['nextPaymentDue'] = vendor_response.get('nextPaymentDue').isoformat() + 'Z' if vendor_response.get('nextPaymentDue') else None
+            
+            # Safe formatting for optional date fields
+            last_payment = vendor_response.get('lastPaymentDate')
+            vendor_response['lastPaymentDate'] = last_payment.isoformat() + 'Z' if last_payment else None
+            
+            next_payment = vendor_response.get('nextPaymentDue')
+            vendor_response['nextPaymentDue'] = next_payment.isoformat() + 'Z' if next_payment else None
+            
+            # 🛡️ ENSURE DATA CONSISTENCY: Add required fields with defaults
+            vendor_response.setdefault('totalOwed', 0.0)
+            vendor_response.setdefault('paidAmount', 0.0)
+            vendor_response.setdefault('remainingOwed', 0.0)
+            vendor_response.setdefault('status', 'active')
+            vendor_response.setdefault('overdueDays', 0)
+            vendor_response.setdefault('tags', [])
             
             return jsonify({
                 'success': True,
@@ -615,10 +711,34 @@ def init_creditors_blueprint(mongo, token_required, serialize_doc):
                 'updatedAt': datetime.utcnow()
             }
             
-            result = mongo.db.creditor_transactions.insert_one(transaction_data)
-            
-            # Update creditor balance
-            update_creditor_balance(ObjectId(data['creditorId']), current_user['_id'])
+            # 🛡️ ATOMIC TRANSACTION: Insert transaction and update balance atomically
+            try:
+                result = mongo.db.creditor_transactions.insert_one(transaction_data)
+                if not result.inserted_id:
+                    return jsonify({
+                        'success': False,
+                        'message': 'Failed to create transaction in database',
+                        'errors': {'general': ['Database insertion failed']}
+                    }), 500
+                
+                # Update creditor balance with error handling
+                balance_updated = update_creditor_balance(ObjectId(data['creditorId']), current_user['_id'])
+                if not balance_updated:
+                    # Rollback transaction if balance update fails
+                    mongo.db.creditor_transactions.delete_one({'_id': result.inserted_id})
+                    return jsonify({
+                        'success': False,
+                        'message': 'Failed to update creditor balance',
+                        'errors': {'general': ['Balance calculation failed']}
+                    }), 500
+                    
+            except Exception as db_error:
+                print(f"Database error during transaction creation: {str(db_error)}")
+                return jsonify({
+                    'success': False,
+                    'message': 'Database error occurred',
+                    'errors': {'general': [f'Database operation failed: {str(db_error)}']}
+                }), 500
             
             # Return created transaction
             created_transaction = mongo.db.creditor_transactions.find_one({'_id': result.inserted_id})

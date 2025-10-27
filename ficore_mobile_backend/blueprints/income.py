@@ -134,24 +134,8 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
                     'errors': errors
                 }), 400
             
-            # Check FiCore Credits balance
-            credit_cost = 1  # 1 FC per income entry
-            user = mongo.db.users.find_one({'_id': current_user['_id']})
-            current_balance = user.get('ficoreCreditBalance', 0.0)
-            
-            if current_balance < credit_cost:
-                return jsonify({
-                    'success': False,
-                    'message': 'Insufficient credits',
-                    'errors': {
-                        'credits': [f'You need {credit_cost} FC to add an income record. Current balance: {current_balance} FC']
-                    },
-                    'data': {
-                        'currentBalance': current_balance,
-                        'requiredAmount': credit_cost,
-                        'shortfall': credit_cost - current_balance
-                    }
-                }), 402  # Payment Required
+            # NOTE: Credit checking and deduction is handled by frontend executeWithCredits()
+            # No need to check/deduct credits here to avoid double deduction
             
             # Simplified: No recurring logic - all incomes are one-time entries
             
@@ -183,33 +167,8 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
             result = mongo.db.incomes.insert_one(income_data)
             income_id = str(result.inserted_id)
             
-            # Deduct FiCore Credits
-            new_balance = current_balance - credit_cost
-            mongo.db.users.update_one(
-                {'_id': current_user['_id']},
-                {'$set': {'ficoreCreditBalance': new_balance}}
-            )
-            
-            # Create transaction record
-            from bson import ObjectId as BsonObjectId
-            transaction = {
-                '_id': BsonObjectId(),
-                'userId': current_user['_id'],
-                'type': 'debit',
-                'amount': credit_cost,
-                'description': f'Income entry: {income_data["source"]}',
-                'operation': 'create_income',
-                'balanceBefore': current_balance,
-                'balanceAfter': new_balance,
-                'status': 'completed',
-                'createdAt': datetime.utcnow(),
-                'metadata': {
-                    'operation': 'create_income',
-                    'incomeId': income_id,
-                    'deductionType': 'app_usage'
-                }
-            }
-            mongo.db.creditTransactions.insert_one(transaction)
+            # NOTE: Credit deduction is handled by frontend executeWithCredits()
+            # to avoid double deduction
             
             return jsonify({
                 'success': True,
@@ -219,9 +178,7 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
                     'source': income_data['source'],
                     'salesType': income_data.get('salesType'),
                     'category': income_data['category'],
-                    'frequency': income_data['frequency'],
-                    'creditBalance': new_balance,
-                    'creditsUsed': credit_cost
+                    'frequency': income_data['frequency']
                 },
                 'message': 'Income record created successfully'
             })

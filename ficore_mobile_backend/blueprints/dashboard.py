@@ -710,4 +710,597 @@ def init_dashboard_blueprint(mongo, token_required, serialize_doc):
                 'errors': {'general': [str(e)]}
             }), 500
 
+    @dashboard_bp.route('/expense-summary', methods=['GET'])
+    @token_required
+    def get_expense_summary(current_user):
+        """Get expense module summary for dashboard"""
+        try:
+            period = request.args.get('period', 'monthly')
+            start_date, end_date = get_date_range(period)
+            
+            # Get expense data for period
+            expenses = list(mongo.db.expenses.find({
+                'userId': current_user['_id'],
+                'date': {'$gte': start_date, '$lte': end_date}
+            }))
+            
+            # Calculate summary
+            total_expenses = sum(expense['amount'] for expense in expenses)
+            expense_count = len(expenses)
+            
+            # Group by category
+            expense_by_category = defaultdict(float)
+            for expense in expenses:
+                expense_by_category[expense.get('category', 'Other')] += expense['amount']
+            
+            # Separate COGS from other expenses
+            cogs_expenses = [exp for exp in expenses if exp.get('category') == 'Cost of Goods Sold']
+            operating_expenses = [exp for exp in expenses if exp.get('category') != 'Cost of Goods Sold']
+            
+            total_cogs = sum(exp['amount'] for exp in cogs_expenses)
+            total_operating = sum(exp['amount'] for exp in operating_expenses)
+            
+            # Recent expenses
+            recent_expenses = sorted(expenses, key=lambda x: x['date'], reverse=True)[:5]
+            recent_expense_data = []
+            for expense in recent_expenses:
+                expense_data = serialize_doc(expense.copy())
+                expense_data['date'] = expense_data.get('date', datetime.utcnow()).isoformat() + 'Z'
+                recent_expense_data.append(expense_data)
+            
+            summary_data = {
+                'period': period,
+                'totalExpenses': total_expenses,
+                'totalCogs': total_cogs,
+                'totalOperating': total_operating,
+                'expenseCount': expense_count,
+                'averageExpense': total_expenses / expense_count if expense_count > 0 else 0,
+                'expenseByCategory': dict(expense_by_category),
+                'recentExpenses': recent_expense_data
+            }
+            
+            return jsonify({
+                'success': True,
+                'data': summary_data,
+                'message': 'Expense summary retrieved successfully'
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve expense summary',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @dashboard_bp.route('/debtors-summary', methods=['GET'])
+    @token_required
+    def get_debtors_summary(current_user):
+        """Get debtors module summary for dashboard"""
+        try:
+            # Get all debtors for user
+            debtors = list(mongo.db.debtors.find({'userId': current_user['_id']}))
+            
+            # Calculate summary metrics
+            total_customers = len(debtors)
+            total_debt = sum(debtor['totalDebt'] for debtor in debtors)
+            total_outstanding = sum(debtor['remainingDebt'] for debtor in debtors)
+            total_paid = total_debt - total_outstanding
+            
+            # Status breakdown
+            active_customers = len([d for d in debtors if d['status'] == 'active'])
+            overdue_customers = len([d for d in debtors if d['status'] == 'overdue'])
+            paid_customers = len([d for d in debtors if d['status'] == 'paid'])
+            
+            # Overdue amount
+            overdue_amount = sum(debtor['remainingDebt'] for debtor in debtors if debtor['status'] == 'overdue')
+            
+            # Payment rate calculation
+            payment_rate = (total_paid / total_debt * 100) if total_debt > 0 else 0
+            
+            # Top debtors by outstanding amount
+            top_debtors = sorted(debtors, key=lambda x: x['remainingDebt'], reverse=True)[:5]
+            top_debtors_data = []
+            for debtor in top_debtors:
+                debtor_data = serialize_doc(debtor.copy())
+                top_debtors_data.append(debtor_data)
+            
+            # Recent transactions
+            recent_transactions = list(mongo.db.debtor_transactions.find({
+                'userId': current_user['_id']
+            }).sort('transactionDate', -1).limit(5))
+            
+            recent_transaction_data = []
+            for transaction in recent_transactions:
+                transaction_data = serialize_doc(transaction.copy())
+                transaction_data['transactionDate'] = transaction_data.get('transactionDate', datetime.utcnow()).isoformat() + 'Z'
+                recent_transaction_data.append(transaction_data)
+            
+            summary_data = {
+                'totalCustomers': total_customers,
+                'activeCustomers': active_customers,
+                'overdueCustomers': overdue_customers,
+                'paidCustomers': paid_customers,
+                'totalDebt': total_debt,
+                'totalOutstanding': total_outstanding,
+                'totalPaid': total_paid,
+                'overdueAmount': overdue_amount,
+                'paymentRate': round(payment_rate, 2),
+                'topDebtors': top_debtors_data,
+                'recentTransactions': recent_transaction_data
+            }
+            
+            return jsonify({
+                'success': True,
+                'data': summary_data,
+                'message': 'Debtors summary retrieved successfully'
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve debtors summary',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @dashboard_bp.route('/creditors-summary', methods=['GET'])
+    @token_required
+    def get_creditors_summary(current_user):
+        """Get creditors module summary for dashboard"""
+        try:
+            # Get all creditors for user
+            creditors = list(mongo.db.creditors.find({'userId': current_user['_id']}))
+            
+            # Calculate summary metrics
+            total_vendors = len(creditors)
+            total_owed = sum(creditor['totalOwed'] for creditor in creditors)
+            total_outstanding = sum(creditor['remainingOwed'] for creditor in creditors)
+            total_paid = total_owed - total_outstanding
+            
+            # Status breakdown
+            active_vendors = len([c for c in creditors if c['status'] == 'active'])
+            overdue_vendors = len([c for c in creditors if c['status'] == 'overdue'])
+            paid_vendors = len([c for c in creditors if c['status'] == 'paid'])
+            
+            # Overdue amount
+            overdue_amount = sum(creditor['remainingOwed'] for creditor in creditors if creditor['status'] == 'overdue')
+            
+            # Payment rate calculation
+            payment_rate = (total_paid / total_owed * 100) if total_owed > 0 else 0
+            
+            # Top creditors by outstanding amount
+            top_creditors = sorted(creditors, key=lambda x: x['remainingOwed'], reverse=True)[:5]
+            top_creditors_data = []
+            for creditor in top_creditors:
+                creditor_data = serialize_doc(creditor.copy())
+                top_creditors_data.append(creditor_data)
+            
+            # Recent transactions
+            recent_transactions = list(mongo.db.creditor_transactions.find({
+                'userId': current_user['_id']
+            }).sort('transactionDate', -1).limit(5))
+            
+            recent_transaction_data = []
+            for transaction in recent_transactions:
+                transaction_data = serialize_doc(transaction.copy())
+                transaction_data['transactionDate'] = transaction_data.get('transactionDate', datetime.utcnow()).isoformat() + 'Z'
+                recent_transaction_data.append(transaction_data)
+            
+            summary_data = {
+                'totalVendors': total_vendors,
+                'activeVendors': active_vendors,
+                'overdueVendors': overdue_vendors,
+                'paidVendors': paid_vendors,
+                'totalOwed': total_owed,
+                'totalOutstanding': total_outstanding,
+                'totalPaid': total_paid,
+                'overdueAmount': overdue_amount,
+                'paymentRate': round(payment_rate, 2),
+                'topCreditors': top_creditors_data,
+                'recentTransactions': recent_transaction_data
+            }
+            
+            return jsonify({
+                'success': True,
+                'data': summary_data,
+                'message': 'Creditors summary retrieved successfully'
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve creditors summary',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @dashboard_bp.route('/inventory-summary', methods=['GET'])
+    @token_required
+    def get_inventory_summary(current_user):
+        """Get inventory module summary for dashboard"""
+        try:
+            # Get all inventory items for user
+            items = list(mongo.db.inventory_items.find({'userId': current_user['_id']}))
+            
+            # Calculate summary metrics
+            total_items = len(items)
+            total_stock = sum(item['currentStock'] for item in items)
+            total_value = sum(item['currentStock'] * item['costPrice'] for item in items)
+            
+            # Stock status breakdown
+            in_stock_items = len([item for item in items if item['currentStock'] > item['minimumStock']])
+            low_stock_items = len([item for item in items if 0 < item['currentStock'] <= item['minimumStock']])
+            out_of_stock_items = len([item for item in items if item['currentStock'] == 0])
+            
+            # Category breakdown
+            category_breakdown = defaultdict(lambda: {'items': 0, 'value': 0, 'stock': 0})
+            for item in items:
+                category = item.get('category', 'Other')
+                category_breakdown[category]['items'] += 1
+                category_breakdown[category]['stock'] += item['currentStock']
+                category_breakdown[category]['value'] += item['currentStock'] * item['costPrice']
+            
+            # Low stock alerts
+            low_stock_alerts = []
+            for item in items:
+                if item['currentStock'] <= item['minimumStock']:
+                    low_stock_alerts.append({
+                        'itemId': str(item['_id']),
+                        'itemName': item['itemName'],
+                        'currentStock': item['currentStock'],
+                        'minimumStock': item['minimumStock'],
+                        'status': 'out_of_stock' if item['currentStock'] == 0 else 'low_stock'
+                    })
+            
+            # Recent movements
+            recent_movements = list(mongo.db.inventory_movements.find({
+                'userId': current_user['_id']
+            }).sort('movementDate', -1).limit(10))
+            
+            recent_movement_data = []
+            for movement in recent_movements:
+                movement_data = serialize_doc(movement.copy())
+                movement_data['movementDate'] = movement_data.get('movementDate', datetime.utcnow()).isoformat() + 'Z'
+                recent_movement_data.append(movement_data)
+            
+            summary_data = {
+                'totalItems': total_items,
+                'totalStock': total_stock,
+                'totalValue': total_value,
+                'inStockItems': in_stock_items,
+                'lowStockItems': low_stock_items,
+                'outOfStockItems': out_of_stock_items,
+                'categoryBreakdown': dict(category_breakdown),
+                'lowStockAlerts': low_stock_alerts,
+                'recentMovements': recent_movement_data,
+                'averageItemValue': total_value / total_items if total_items > 0 else 0
+            }
+            
+            return jsonify({
+                'success': True,
+                'data': summary_data,
+                'message': 'Inventory summary retrieved successfully'
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve inventory summary',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @dashboard_bp.route('/analytics', methods=['GET'])
+    @token_required
+    def get_analytics_data(current_user):
+        """Get comprehensive analytics data for the analytics screen"""
+        try:
+            period = request.args.get('period', 'monthly')
+            start_date, end_date = get_date_range(period)
+            
+            # Get comprehensive profit metrics
+            profit_metrics = calculate_profit_metrics(current_user['_id'], start_date, end_date)
+            
+            # Get trend data for the last 12 months
+            monthly_trends = []
+            for i in range(12):
+                month_end = datetime.utcnow().replace(day=1) - timedelta(days=i*30)
+                month_start = month_end - timedelta(days=30)
+                
+                month_metrics = calculate_profit_metrics(current_user['_id'], month_start, month_end)
+                monthly_trends.append({
+                    'month': month_start.strftime('%Y-%m'),
+                    'revenue': month_metrics['totalRevenue'],
+                    'expenses': month_metrics['totalExpenses'],
+                    'grossProfit': month_metrics['grossProfit'],
+                    'netProfit': month_metrics['netProfit'],
+                    'grossMargin': month_metrics['grossMargin'],
+                    'netMargin': month_metrics['netMargin']
+                })
+            
+            monthly_trends.reverse()  # Oldest to newest
+            
+            # Business health score calculation
+            health_score = 0
+            health_factors = []
+            
+            # Revenue health (25 points)
+            if profit_metrics['totalRevenue'] > 0:
+                health_score += 25
+                health_factors.append({'factor': 'Revenue Generation', 'score': 25, 'status': 'good'})
+            else:
+                health_factors.append({'factor': 'Revenue Generation', 'score': 0, 'status': 'poor'})
+            
+            # Profitability health (25 points)
+            if profit_metrics['netProfit'] > 0:
+                health_score += 25
+                health_factors.append({'factor': 'Profitability', 'score': 25, 'status': 'good'})
+            elif profit_metrics['netProfit'] == 0:
+                health_score += 12
+                health_factors.append({'factor': 'Profitability', 'score': 12, 'status': 'fair'})
+            else:
+                health_factors.append({'factor': 'Profitability', 'score': 0, 'status': 'poor'})
+            
+            # Cash flow health (20 points) - based on receivables vs payables
+            debtors_outstanding = mongo.db.debtors.aggregate([
+                {'$match': {'userId': current_user['_id']}},
+                {'$group': {'_id': None, 'total': {'$sum': '$remainingDebt'}}}
+            ])
+            debtors_outstanding = list(debtors_outstanding)
+            total_receivables = debtors_outstanding[0]['total'] if debtors_outstanding else 0
+            
+            creditors_outstanding = mongo.db.creditors.aggregate([
+                {'$match': {'userId': current_user['_id']}},
+                {'$group': {'_id': None, 'total': {'$sum': '$remainingOwed'}}}
+            ])
+            creditors_outstanding = list(creditors_outstanding)
+            total_payables = creditors_outstanding[0]['total'] if creditors_outstanding else 0
+            
+            if total_receivables >= total_payables:
+                health_score += 20
+                health_factors.append({'factor': 'Cash Flow', 'score': 20, 'status': 'good'})
+            else:
+                health_score += 10
+                health_factors.append({'factor': 'Cash Flow', 'score': 10, 'status': 'fair'})
+            
+            # Inventory health (15 points)
+            low_stock_count = mongo.db.inventory_items.count_documents({
+                'userId': current_user['_id'],
+                '$expr': {'$lte': ['$currentStock', '$minimumStock']}
+            })
+            
+            if low_stock_count == 0:
+                health_score += 15
+                health_factors.append({'factor': 'Inventory Management', 'score': 15, 'status': 'good'})
+            elif low_stock_count <= 5:
+                health_score += 10
+                health_factors.append({'factor': 'Inventory Management', 'score': 10, 'status': 'fair'})
+            else:
+                health_score += 5
+                health_factors.append({'factor': 'Inventory Management', 'score': 5, 'status': 'poor'})
+            
+            # Customer base health (15 points)
+            total_customers = mongo.db.debtors.count_documents({'userId': current_user['_id']})
+            if total_customers >= 10:
+                health_score += 15
+                health_factors.append({'factor': 'Customer Base', 'score': 15, 'status': 'good'})
+            elif total_customers >= 5:
+                health_score += 10
+                health_factors.append({'factor': 'Customer Base', 'score': 10, 'status': 'fair'})
+            elif total_customers > 0:
+                health_score += 5
+                health_factors.append({'factor': 'Customer Base', 'score': 5, 'status': 'poor'})
+            else:
+                health_factors.append({'factor': 'Customer Base', 'score': 0, 'status': 'poor'})
+            
+            # Determine health status
+            if health_score >= 80:
+                health_status = 'excellent'
+            elif health_score >= 60:
+                health_status = 'good'
+            elif health_score >= 40:
+                health_status = 'fair'
+            else:
+                health_status = 'needs_attention'
+            
+            # Generate insights and recommendations
+            insights = []
+            recommendations = []
+            
+            if profit_metrics['netMargin'] > 20:
+                insights.append({
+                    'type': 'positive',
+                    'title': 'Strong Profitability',
+                    'description': f'Your net profit margin of {profit_metrics["netMargin"]:.1f}% is excellent'
+                })
+            elif profit_metrics['netMargin'] < 5:
+                insights.append({
+                    'type': 'warning',
+                    'title': 'Low Profit Margins',
+                    'description': f'Your net profit margin of {profit_metrics["netMargin"]:.1f}% needs improvement'
+                })
+                recommendations.append({
+                    'priority': 'high',
+                    'title': 'Improve Profit Margins',
+                    'description': 'Consider reducing costs or increasing prices to improve profitability'
+                })
+            
+            if low_stock_count > 0:
+                insights.append({
+                    'type': 'warning',
+                    'title': 'Inventory Alert',
+                    'description': f'{low_stock_count} items are running low on stock'
+                })
+                recommendations.append({
+                    'priority': 'medium',
+                    'title': 'Restock Inventory',
+                    'description': 'Review and restock low inventory items to avoid stockouts'
+                })
+            
+            overdue_customers = mongo.db.debtors.count_documents({
+                'userId': current_user['_id'],
+                'status': 'overdue'
+            })
+            
+            if overdue_customers > 0:
+                insights.append({
+                    'type': 'warning',
+                    'title': 'Overdue Payments',
+                    'description': f'{overdue_customers} customers have overdue payments'
+                })
+                recommendations.append({
+                    'priority': 'high',
+                    'title': 'Follow Up on Overdue Payments',
+                    'description': 'Contact customers with overdue payments to improve cash flow'
+                })
+            
+            analytics_data = {
+                'period': period,
+                'dateRange': {
+                    'startDate': start_date.isoformat() + 'Z',
+                    'endDate': end_date.isoformat() + 'Z'
+                },
+                'profitMetrics': profit_metrics,
+                'monthlyTrends': monthly_trends,
+                'businessHealth': {
+                    'score': health_score,
+                    'status': health_status,
+                    'factors': health_factors
+                },
+                'insights': insights,
+                'recommendations': recommendations,
+                'kpis': {
+                    'totalRevenue': profit_metrics['totalRevenue'],
+                    'totalProfit': profit_metrics['netProfit'],
+                    'profitMargin': profit_metrics['netMargin'],
+                    'totalCustomers': total_customers,
+                    'outstandingReceivables': total_receivables,
+                    'outstandingPayables': total_payables,
+                    'inventoryValue': 0,  # Will be calculated from inventory summary
+                    'lowStockItems': low_stock_count
+                }
+            }
+            
+            return jsonify({
+                'success': True,
+                'data': analytics_data,
+                'message': 'Analytics data retrieved successfully'
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve analytics data',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @dashboard_bp.route('/export-data', methods=['POST'])
+    @token_required
+    def export_dashboard_data(current_user):
+        """Export comprehensive dashboard data for reports"""
+        try:
+            export_type = request.json.get('exportType', 'summary')
+            start_date_str = request.json.get('startDate')
+            end_date_str = request.json.get('endDate')
+            
+            # Parse dates if provided
+            start_date = None
+            end_date = None
+            if start_date_str:
+                start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+            if end_date_str:
+                end_date = datetime.fromisoformat(end_date_str.replace('Z', '+00:00'))
+            
+            if not start_date or not end_date:
+                start_date, end_date = get_date_range('monthly')
+            
+            export_data = {
+                'user': {
+                    'id': str(current_user['_id']),
+                    'email': current_user['email'],
+                    'displayName': current_user.get('displayName', ''),
+                    'businessName': current_user.get('businessName', ''),
+                },
+                'dateRange': {
+                    'startDate': start_date.isoformat() + 'Z',
+                    'endDate': end_date.isoformat() + 'Z'
+                },
+                'exportType': export_type,
+                'generatedAt': datetime.utcnow().isoformat() + 'Z'
+            }
+            
+            if export_type in ['summary', 'complete']:
+                # Include profit metrics
+                export_data['profitMetrics'] = calculate_profit_metrics(current_user['_id'], start_date, end_date)
+                
+                # Include module summaries
+                export_data['moduleSummaries'] = {}
+                
+                # Income summary
+                incomes = list(mongo.db.incomes.find({
+                    'userId': current_user['_id'],
+                    'dateReceived': {'$gte': start_date, '$lte': end_date}
+                }))
+                export_data['moduleSummaries']['income'] = {
+                    'totalAmount': sum(income['amount'] for income in incomes),
+                    'transactionCount': len(incomes)
+                }
+                
+                # Expense summary
+                expenses = list(mongo.db.expenses.find({
+                    'userId': current_user['_id'],
+                    'date': {'$gte': start_date, '$lte': end_date}
+                }))
+                export_data['moduleSummaries']['expenses'] = {
+                    'totalAmount': sum(expense['amount'] for expense in expenses),
+                    'transactionCount': len(expenses)
+                }
+                
+                # Debtors summary
+                debtors = list(mongo.db.debtors.find({'userId': current_user['_id']}))
+                export_data['moduleSummaries']['debtors'] = {
+                    'totalCustomers': len(debtors),
+                    'totalOutstanding': sum(debtor['remainingDebt'] for debtor in debtors),
+                    'overdueCustomers': len([d for d in debtors if d['status'] == 'overdue'])
+                }
+                
+                # Creditors summary
+                creditors = list(mongo.db.creditors.find({'userId': current_user['_id']}))
+                export_data['moduleSummaries']['creditors'] = {
+                    'totalVendors': len(creditors),
+                    'totalOutstanding': sum(creditor['remainingOwed'] for creditor in creditors),
+                    'overdueVendors': len([c for c in creditors if c['status'] == 'overdue'])
+                }
+                
+                # Inventory summary
+                inventory_items = list(mongo.db.inventory_items.find({'userId': current_user['_id']}))
+                export_data['moduleSummaries']['inventory'] = {
+                    'totalItems': len(inventory_items),
+                    'totalValue': sum(item['currentStock'] * item['costPrice'] for item in inventory_items),
+                    'lowStockItems': len([item for item in inventory_items if item['currentStock'] <= item['minimumStock']])
+                }
+                
+                # Include alerts
+                export_data['alerts'] = get_alerts_and_reminders(current_user['_id'])
+            
+            if export_type == 'complete':
+                # Include detailed transaction data
+                export_data['detailedData'] = {
+                    'incomes': [serialize_doc(income) for income in incomes],
+                    'expenses': [serialize_doc(expense) for expense in expenses],
+                    'debtors': [serialize_doc(debtor) for debtor in debtors],
+                    'creditors': [serialize_doc(creditor) for creditor in creditors],
+                    'inventoryItems': [serialize_doc(item) for item in inventory_items]
+                }
+            
+            return jsonify({
+                'success': True,
+                'data': export_data,
+                'message': 'Export data prepared successfully'
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to prepare export data',
+                'errors': {'general': [str(e)]}
+            }), 500
+
     return dashboard_bp

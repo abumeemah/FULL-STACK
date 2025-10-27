@@ -42,6 +42,27 @@ class DatabaseSchema:
             'deletedAt': Optional[datetime],  # Soft delete timestamp
             'resetToken': Optional[str],  # Password reset token
             'resetTokenExpiry': Optional[datetime],  # Reset token expiration
+            
+            # Profile completion fields for rewards
+            'businessName': Optional[str],  # Business name
+            'businessType': Optional[str],  # 'Sole Proprietor', 'Partnership', 'LLC', 'NGO', 'Other'
+            'businessTypeOther': Optional[str],  # Custom business type if 'Other' selected
+            'industry': Optional[str],  # 'Retail', 'Services', 'Manufacturing', etc.
+            'physicalAddress': Optional[Dict[str, str]],  # {'street': '', 'city': '', 'state': '', 'postalCode': ''}
+            'taxIdentificationNumber': Optional[str],  # Encrypted TIN
+            'profilePictureUrl': Optional[str],  # Profile picture URL
+            'socialMediaLinks': Optional[List[Dict[str, str]]],  # [{'platform': 'twitter', 'url': '...'}]
+            'numberOfEmployees': Optional[int],  # Number of employees (0 for none)
+            'profileCompletionPercentage': Optional[float],  # Calculated completion percentage
+            
+            # Subscription fields
+            'isSubscribed': bool,  # Subscription status, default: False
+            'subscriptionType': Optional[str],  # 'monthly', 'annually', null
+            'subscriptionStartDate': Optional[datetime],  # Subscription start date
+            'subscriptionEndDate': Optional[datetime],  # Subscription end date
+            'subscriptionAutoRenew': bool,  # Auto-renewal setting, default: False
+            'paymentMethodDetails': Optional[Dict[str, str]],  # Encrypted payment details
+            'trialExpiryDate': Optional[datetime],  # Trial expiry date
             'settings': {  # User preferences and settings
                 'notifications': {
                     'push': bool,  # Push notifications enabled
