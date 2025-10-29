@@ -155,29 +155,30 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
                 }
                 mongo.db.rewards.insert_one(rewards_record)
 
-            # Update daily activity and streak
+            # Update daily activity and streak with proper logic
             today = datetime.utcnow().date()
             last_active = rewards_record.get('last_active_date')
             current_streak = rewards_record.get('streak', 0)
             
-            # Check if user was active today (we'll track this via track-activity endpoint)
-            # For now, assume they're active since they're accessing the rewards dashboard
+            # Calculate streak based on actual activity tracking
             if last_active:
                 last_active_date = last_active.date() if isinstance(last_active, datetime) else last_active
                 yesterday = today - timedelta(days=1)
                 
-                if last_active_date == yesterday:
-                    # Continue streak
+                if last_active_date == today:
+                    # Already active today, keep current streak
+                    pass
+                elif last_active_date == yesterday:
+                    # Continue streak - user was active yesterday and is active today
                     current_streak += 1
-                elif last_active_date != today:
-                    # Reset streak
+                else:
+                    # Gap in activity, reset streak to 1 (today's activity)
                     current_streak = 1
-                # If last_active_date == today, keep current streak
             else:
                 # First time activity
                 current_streak = 1
             
-            # Update rewards record
+            # Update rewards record with current activity
             mongo.db.rewards.update_one(
                 {'_id': rewards_record['_id']},
                 {
@@ -227,8 +228,18 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
                     'fc_balance': float(user.get('ficoreCreditBalance', 0.0)),
                     'streak': current_streak,
                     'next_milestone': next_milestone,
-                    'last_active_date': datetime.utcnow().isoformat() + 'Z',
+                    'last_active_date': rewards_record.get('last_active_date', datetime.utcnow()).isoformat() + 'Z',
                     'active_benefits': active_benefits,
+                    'earned_bonuses': {
+                        'earned_7day_streak_bonus': user.get('earned_7day_streak_bonus', False),
+                        'earned_30day_streak_bonus': user.get('earned_30day_streak_bonus', False),
+                        'earned_90day_streak_bonus': user.get('earned_90day_streak_bonus', False),
+                        'earned_first_debtors_access_bonus': user.get('earned_first_debtors_access_bonus', False),
+                        'earned_first_creditors_access_bonus': user.get('earned_first_creditors_access_bonus', False),
+                        'earned_first_inventory_access_bonus': user.get('earned_first_inventory_access_bonus', False),
+                        'earned_first_advanced_report_bonus': user.get('earned_first_advanced_report_bonus', False),
+                        'earned_profile_complete_bonus': user.get('earned_profile_complete_bonus', False),
+                    },
                     'earning_opportunities': earning_opportunities,
                     'available_rewards': list(REWARD_CONFIG.keys())
                 },
@@ -400,9 +411,17 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
             benefit_applied = _apply_reward_benefit(mongo, current_user['_id'], reward_config)
             
             if not benefit_applied:
+                # Rollback the credit deduction if benefit application fails
+                mongo.db.users.update_one(
+                    {'_id': current_user['_id']},
+                    {'$set': {'ficoreCreditBalance': current_balance}}
+                )
+                # Remove the transaction record
+                mongo.db.credit_transactions.delete_one({'_id': transaction['_id']})
+                
                 return jsonify({
                     'success': False,
-                    'message': 'Failed to apply reward benefit'
+                    'message': 'Failed to apply reward benefit. Credits have been refunded.'
                 }), 500
 
             return jsonify({
@@ -412,9 +431,10 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
                     'reward_name': reward_config['name'],
                     'cost_deducted': cost,
                     'new_balance': new_balance,
-                    'benefit_applied': reward_config['benefit_type']
+                    'benefit_applied': reward_config['benefit_type'],
+                    'benefit_details': _get_benefit_details(reward_config)
                 },
-                'message': f'Successfully redeemed {reward_config["name"]}!'
+                'message': f'Successfully redeemed {reward_config["name"]}! 🎉'
             })
 
         except Exception as e:
@@ -789,7 +809,10 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
             
             if benefit_type == 'free_entries':
                 amount = reward_config['benefit_amount']
-                update_data['free_income_expense_entries'] = amount
+                # Add to existing free entries instead of replacing
+                user = mongo.db.users.find_one({'_id': user_id})
+                current_entries = user.get('free_income_expense_entries', 0)
+                update_data['free_income_expense_entries'] = current_entries + amount
             elif benefit_type == 'temp_discount':
                 amount = reward_config['benefit_amount']
                 update_data.update({
@@ -815,14 +838,10 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
             elif benefit_type == 'unlock_feature':
                 # Unlock premium features for subscribers
                 feature_key = reward_config['feature_key']
-                if 'unlocked_features' not in update_data:
-                    # Get current unlocked features
-                    user = mongo.db.users.find_one({'_id': user_id})
-                    current_features = user.get('unlocked_features', {})
-                    current_features[feature_key] = True
-                    update_data['unlocked_features'] = current_features
-                else:
-                    update_data['unlocked_features'][feature_key] = True
+                user = mongo.db.users.find_one({'_id': user_id})
+                current_features = user.get('unlocked_features', {})
+                current_features[feature_key] = True
+                update_data['unlocked_features'] = current_features
             elif benefit_type == 'add_item':
                 # Add items like priority support tokens
                 item_key = reward_config['item_key']
@@ -839,15 +858,36 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
                 update_data[limit_key] = current_limit + limit_amount
             
             if update_data:
-                mongo.db.users.update_one(
+                result = mongo.db.users.update_one(
                     {'_id': user_id},
                     {'$set': update_data}
                 )
-                return True
+                return result.modified_count > 0
             
             return False
         except Exception as e:
             print(f"Error applying reward benefit: {str(e)}")
             return False
+
+    def _get_benefit_details(reward_config):
+        """Get human-readable benefit details"""
+        benefit_type = reward_config['benefit_type']
+        
+        if benefit_type == 'free_entries':
+            return f"{reward_config['benefit_amount']} free income/expense entries added to your account"
+        elif benefit_type == 'temp_discount':
+            return f"{reward_config['benefit_amount']}% discount on all FC costs for 24 hours"
+        elif benefit_type == 'trial_extension':
+            return f"Trial extended by {reward_config['benefit_amount']} days"
+        elif benefit_type == 'free_pdf_exports':
+            return f"Free PDF exports for {reward_config['benefit_amount']} days"
+        elif benefit_type == 'unlock_feature':
+            return f"Unlocked premium feature: {reward_config['feature_key']}"
+        elif benefit_type == 'add_item':
+            return f"Added {reward_config['item_amount']} {reward_config['item_key']} to your account"
+        elif benefit_type == 'increase_limit':
+            return f"Increased {reward_config['limit_key']} by {reward_config['limit_amount']}"
+        
+        return "Benefit applied successfully"
 
     return rewards_bp
