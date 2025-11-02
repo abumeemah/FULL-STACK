@@ -535,88 +535,84 @@ def get_expense_insights():
     return _get_expense_insights()
 
 @expenses_bp.route('/statistics', methods=['GET'])
-def get_expense_statistics():
-    @expenses_bp.token_required
-    def _get_expense_statistics(current_user):
-        try:
-            # Get query parameters
-            start_date = request.args.get('start_date')
-            end_date = request.args.get('end_date')
-            group_by = request.args.get('group_by', 'month')  # Default to month
-            
-            # Validate group_by parameter
-            valid_groups = ['month', 'category', 'payment_method']
-            if group_by not in valid_groups:
-                return jsonify({
-                    'success': False,
-                    'message': 'Invalid group_by parameter',
-                    'errors': {'group_by': [f'Must be one of: {", ".join(valid_groups)}']}
-                }), 400
-            
-            # Build query
-            query = {'userId': current_user['_id']}
-            if start_date or end_date:
-                date_query = {}
-                if start_date:
-                    date_query['$gte'] = datetime.fromisoformat(start_date.replace('Z', ''))
-                if end_date:
-                    date_query['$lte'] = datetime.fromisoformat(end_date.replace('Z', ''))
-                query['date'] = date_query
-            
-            # Get expense data
-            expenses = list(expenses_bp.mongo.db.expenses.find(query))
-            
-            # Calculate statistics
-            from collections import defaultdict
-            statistics = defaultdict(float)
-            total = 0
-            count = len(expenses)
-            
-            if group_by == 'month':
-                for expense in expenses:
-                    if expense.get('date'):
-                        month_key = expense['date'].strftime('%Y-%m')
-                        statistics[month_key] += expense.get('amount', 0)
-                        total += expense.get('amount', 0)
-            elif group_by == 'category':
-                for expense in expenses:
-                    category = expense.get('category', 'Unknown')
-                    statistics[category] += expense.get('amount', 0)
-                    total += expense.get('amount', 0)
-            elif group_by == 'payment_method':
-                for expense in expenses:
-                    payment_method = expense.get('paymentMethod', 'Unknown')
-                    statistics[payment_method] += expense.get('amount', 0)
-                    total += expense.get('amount', 0)
-            
-            # Calculate average
-            average = total / count if count > 0 else 0
-            
-            # Prepare summary
-            summary = {
-                'total': total,
-                'average': average,
-                'count': count,
-                'start_date': start_date or datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat() + 'Z',
-                'end_date': end_date or datetime.utcnow().isoformat() + 'Z',
-                'group_by': group_by
-            }
-            
-            return jsonify({
-                'success': True,
-                'data': {
-                    'statistics': dict(statistics),
-                    'summary': summary
-                },
-                'message': 'Expense statistics retrieved successfully'
-            })
-            
-        except Exception as e:
+@token_required
+def get_expense_statistics(current_user):
+    try:
+        # Get query parameters
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        group_by = request.args.get('group_by', 'month')  # Default to month
+        
+        # Validate group_by parameter
+        valid_groups = ['month', 'category', 'payment_method']
+        if group_by not in valid_groups:
             return jsonify({
                 'success': False,
-                'message': 'Failed to retrieve expense statistics',
-                'errors': {'general': [str(e)]}
-            }), 500
-    
-
-    return _get_expense_statistics()
+                'message': 'Invalid group_by parameter',
+                'errors': {'group_by': [f'Must be one of: {", ".join(valid_groups)}']}
+            }), 400
+        
+        # Build query
+        query = {'userId': current_user['_id']}
+        if start_date or end_date:
+            date_query = {}
+            if start_date:
+                date_query['$gte'] = datetime.fromisoformat(start_date.replace('Z', ''))
+            if end_date:
+                date_query['$lte'] = datetime.fromisoformat(end_date.replace('Z', ''))
+            query['date'] = date_query
+        
+        # Get expense data
+        expenses = list(mongo.db.expenses.find(query))
+        
+        # Calculate statistics
+        from collections import defaultdict
+        statistics = defaultdict(float)
+        total = 0
+        count = len(expenses)
+        
+        if group_by == 'month':
+            for expense in expenses:
+                if expense.get('date'):
+                    month_key = expense['date'].strftime('%Y-%m')
+                    statistics[month_key] += expense.get('amount', 0)
+                    total += expense.get('amount', 0)
+        elif group_by == 'category':
+            for expense in expenses:
+                category = expense.get('category', 'Unknown')
+                statistics[category] += expense.get('amount', 0)
+                total += expense.get('amount', 0)
+        elif group_by == 'payment_method':
+            for expense in expenses:
+                payment_method = expense.get('paymentMethod', 'Unknown')
+                statistics[payment_method] += expense.get('amount', 0)
+                total += expense.get('amount', 0)
+            
+        # Calculate average
+        average = total / count if count > 0 else 0
+        
+        # Prepare summary
+        summary = {
+            'total': total,
+            'average': average,
+            'count': count,
+            'start_date': start_date or datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat() + 'Z',
+            'end_date': end_date or datetime.utcnow().isoformat() + 'Z',
+            'group_by': group_by
+        }
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'statistics': dict(statistics),
+                'summary': summary
+            },
+            'message': 'Expense statistics retrieved successfully'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': 'Failed to retrieve expense statistics',
+            'errors': {'general': [str(e)]}
+        }), 500

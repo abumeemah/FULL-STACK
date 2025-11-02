@@ -742,3 +742,4 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
             }), 500
 
     return income_bp
+

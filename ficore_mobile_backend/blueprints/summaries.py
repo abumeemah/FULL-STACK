@@ -504,61 +504,6 @@ def init_summaries_blueprint(mongo, token_required, serialize_doc):
                             },
                             'outOfStockItems': {
                                 '$sum': {'$cond': [{'$lte': ['$currentStock', 0]}, 1, 0]}
-                            }
-                        }
-                    }
-                ]
-                inventory_result = list(mongo.db.inventory_items.aggregate(inventory_pipeline))
-                
-                if inventory_result:
-                    inventory_data = inventory_result[0]
-                    summary_data['inventoryData'] = {
-                        'totalItems': int(inventory_data.get('totalItems', 0)),
-                        'totalValue': float(inventory_data.get('totalValue', 0)),
-                        'totalStock': int(inventory_data.get('totalStock', 0)),
-                        'lowStockItems': int(inventory_data.get('lowStockItems', 0)),
-                        'outOfStockItems': int(inventory_data.get('outOfStockItems', 0))
-                    }
-                else:
-                    summary_data['inventoryData'] = {
-                        'totalItems': 0,
-                        'totalValue': 0.0,
-                        'totalStock': 0,
-                        'lowStockItems': 0,
-                        'outOfStockItems': 0
-                    }
-                
-                print(f"DEBUG ENHANCED SUMMARY - Inventory: {summary_data['inventoryData']}")
-                
-            except Exception as e:
-                print(f"Error fetching inventory data: {e}")
-                summary_data['inventoryData'] = {
-                    'totalItems': 0,
-                    'totalValue': 0.0,
-                    'totalStock': 0,
-                    'lowStockItems': 0,
-                    'outOfStockItems': 0
-                }
-            
-            # ENHANCED: Get inventory data with proper aggregation
-            try:
-                inventory_pipeline = [
-                    {
-                        '$match': {
-                            'userId': current_user['_id']
-                        }
-                    },
-                    {
-                        '$group': {
-                            '_id': None,
-                            'totalItems': {'$sum': 1},
-                            'totalValue': {'$sum': {'$multiply': ['$currentStock', '$costPrice']}},
-                            'totalStock': {'$sum': '$currentStock'},
-                            'lowStockItems': {
-                                '$sum': {'$cond': [{'$lte': ['$currentStock', '$minimumStock']}, 1, 0]}
-                            },
-                            'outOfStockItems': {
-                                '$sum': {'$cond': [{'$lte': ['$currentStock', 0]}, 1, 0]}
                             },
                             'activeItems': {
                                 '$sum': {'$cond': [{'$eq': ['$status', 'active']}, 1, 0]}
