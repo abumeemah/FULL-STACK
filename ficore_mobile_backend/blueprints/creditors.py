@@ -922,6 +922,85 @@ def init_creditors_blueprint(mongo, token_required, serialize_doc):
 
     # ==================== REPORTS & ANALYTICS ENDPOINTS ====================
 
+    @creditors_bp.route('/statistics', methods=['GET'])
+    @token_required
+    def get_creditors_statistics(current_user):
+        """Enhanced statistics endpoint with comprehensive metrics"""
+        try:
+            user_id = current_user['_id']
+            
+            # MongoDB aggregation pipeline for comprehensive stats
+            pipeline = [
+                {"$match": {"userId": user_id}},
+                {"$group": {
+                    "_id": None,
+                    "totalCount": {"$sum": 1},
+                    "totalOwed": {"$sum": "$totalOwed"},
+                    "totalPaid": {"$sum": "$paidAmount"},
+                    "totalOutstanding": {"$sum": "$remainingOwed"},
+                    "averageOwed": {"$avg": "$remainingOwed"},
+                    "maxOwed": {"$max": "$remainingOwed"},
+                    "minOwed": {"$min": "$remainingOwed"},
+                    "activeVendors": {
+                        "$sum": {"$cond": [{"$eq": ["$status", "active"]}, 1, 0]}
+                    },
+                    "overdueVendors": {
+                        "$sum": {"$cond": [{"$eq": ["$status", "overdue"]}, 1, 0]}
+                    },
+                    "paidVendors": {
+                        "$sum": {"$cond": [{"$eq": ["$status", "paid"]}, 1, 0]}
+                    },
+                    "overdueAmount": {
+                        "$sum": {"$cond": [
+                            {"$eq": ["$status", "overdue"]}, 
+                            "$remainingOwed", 
+                            0
+                        ]}
+                    }
+                }}
+            ]
+            
+            result = mongo.db.creditors.aggregate(pipeline)
+            statistics = next(result, {})
+            
+            # Calculate additional metrics
+            total_owed = float(statistics.get('totalOwed', 0))
+            total_paid = float(statistics.get('totalPaid', 0))
+            payment_rate = (total_paid / total_owed * 100) if total_owed > 0 else 0
+            
+            enhanced_stats = {
+                'totalCount': statistics.get('totalCount', 0),
+                'totalVendors': statistics.get('totalCount', 0),  # Alias for consistency
+                'totalOwed': total_owed,
+                'totalPaid': total_paid,
+                'totalOutstanding': float(statistics.get('totalOutstanding', 0)),
+                'averageOwed': float(statistics.get('averageOwed', 0)),
+                'maxOwed': float(statistics.get('maxOwed', 0)),
+                'minOwed': float(statistics.get('minOwed', 0)),
+                'activeVendors': statistics.get('activeVendors', 0),
+                'overdueVendors': statistics.get('overdueVendors', 0),
+                'paidVendors': statistics.get('paidVendors', 0),
+                'overdueAmount': float(statistics.get('overdueAmount', 0)),
+                'paymentRate': round(payment_rate, 2),
+                'dateRange': {
+                    'startDate': datetime.utcnow().replace(day=1).isoformat() + 'Z',
+                    'endDate': datetime.utcnow().isoformat() + 'Z'
+                }
+            }
+            
+            return jsonify({
+                'success': True,
+                'data': enhanced_stats,
+                'message': 'Creditors statistics retrieved successfully'
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve creditors statistics',
+                'errors': {'general': [str(e)]}
+            }), 500
+
     @creditors_bp.route('/summary', methods=['GET'])
     @token_required
     def get_summary(current_user):

@@ -709,5 +709,91 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
                 'errors': {'general': [str(e)]}
             }), 500
 
+    @income_bp.route('/statistics', methods=['GET'])
+    @token_required
+    def get_income_statistics(current_user):
+        """Get comprehensive income statistics"""
+        try:
+            # Get date range parameters
+            start_date_str = request.args.get('start_date')
+            end_date_str = request.args.get('end_date')
+            
+            # Default to current month if no dates provided
+            now = datetime.utcnow()
+            if start_date_str:
+                start_date = datetime.fromisoformat(start_date_str.replace('Z', ''))
+            else:
+                start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            
+            if end_date_str:
+                end_date = datetime.fromisoformat(end_date_str.replace('Z', ''))
+            else:
+                end_date = now
+            
+            # Get income statistics using aggregation
+            statistics_pipeline = [
+                {
+                    '$match': {
+                        'userId': current_user['_id'],
+                        'dateReceived': {
+                            '$gte': start_date,
+                            '$lte': end_date
+                        }
+                    }
+                },
+                {
+                    '$group': {
+                        '_id': None,
+                        'totalAmount': {'$sum': '$amount'},
+                        'totalCount': {'$sum': 1},
+                        'averageAmount': {'$avg': '$amount'},
+                        'maxAmount': {'$max': '$amount'},
+                        'minAmount': {'$min': '$amount'}
+                    }
+                }
+            ]
+            
+            stats_result = list(mongo.db.incomes.aggregate(statistics_pipeline))
+            
+            if stats_result:
+                stats = stats_result[0]
+                statistics_data = {
+                    'totalAmount': float(stats.get('totalAmount', 0)),
+                    'totalCount': int(stats.get('totalCount', 0)),
+                    'averageAmount': float(stats.get('averageAmount', 0)),
+                    'maxAmount': float(stats.get('maxAmount', 0)),
+                    'minAmount': float(stats.get('minAmount', 0)),
+                    'dateRange': {
+                        'startDate': start_date.isoformat() + 'Z',
+                        'endDate': end_date.isoformat() + 'Z'
+                    }
+                }
+            else:
+                statistics_data = {
+                    'totalAmount': 0.0,
+                    'totalCount': 0,
+                    'averageAmount': 0.0,
+                    'maxAmount': 0.0,
+                    'minAmount': 0.0,
+                    'dateRange': {
+                        'startDate': start_date.isoformat() + 'Z',
+                        'endDate': end_date.isoformat() + 'Z'
+                    }
+                }
+            
+            return jsonify({
+                'success': True,
+                'data': statistics_data,
+                'message': 'Income statistics retrieved successfully'
+            })
+            
+        except Exception as e:
+            print(f"Error in get_income_statistics: {e}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve income statistics',
+                'errors': {'general': [str(e)]}
+            }), 500
+
     return income_bp
 

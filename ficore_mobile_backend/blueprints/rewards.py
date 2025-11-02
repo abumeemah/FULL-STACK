@@ -155,40 +155,11 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
                 }
                 mongo.db.rewards.insert_one(rewards_record)
 
-            # Update daily activity and streak with proper logic
-            today = datetime.utcnow().date()
-            last_active = rewards_record.get('last_active_date')
+            # Get current streak and last active date (don't update just by viewing rewards)
             current_streak = rewards_record.get('streak', 0)
+            last_active = rewards_record.get('last_active_date')
             
-            # Calculate streak based on actual activity tracking
-            if last_active:
-                last_active_date = last_active.date() if isinstance(last_active, datetime) else last_active
-                yesterday = today - timedelta(days=1)
-                
-                if last_active_date == today:
-                    # Already active today, keep current streak
-                    pass
-                elif last_active_date == yesterday:
-                    # Continue streak - user was active yesterday and is active today
-                    current_streak += 1
-                else:
-                    # Gap in activity, reset streak to 1 (today's activity)
-                    current_streak = 1
-            else:
-                # First time activity
-                current_streak = 1
-            
-            # Update rewards record with current activity
-            mongo.db.rewards.update_one(
-                {'_id': rewards_record['_id']},
-                {
-                    '$set': {
-                        'streak': current_streak,
-                        'last_active_date': datetime.utcnow(),
-                        'updated_at': datetime.utcnow()
-                    }
-                }
-            )
+            # Don't update activity just by viewing rewards - only update via track-activity endpoint
 
             # Check for streak milestone rewards (with error handling)
             try:
@@ -284,11 +255,34 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
                 }
                 mongo.db.rewards.insert_one(rewards_record)
             else:
-                # Update last active date
+                # Calculate streak based on actual activity tracking
+                today = datetime.utcnow().date()
+                last_active = rewards_record.get('last_active_date')
+                current_streak = rewards_record.get('streak', 0)
+                
+                if last_active:
+                    last_active_date = last_active.date() if isinstance(last_active, datetime) else last_active
+                    yesterday = today - timedelta(days=1)
+                    
+                    if last_active_date == today:
+                        # Already active today, keep current streak
+                        pass
+                    elif last_active_date == yesterday:
+                        # Continue streak - user was active yesterday and is active today
+                        current_streak += 1
+                    else:
+                        # Gap in activity, reset streak to 1 (today's activity)
+                        current_streak = 1
+                else:
+                    # First time activity
+                    current_streak = 1
+                
+                # Update rewards record with proper streak calculation
                 mongo.db.rewards.update_one(
                     {'_id': rewards_record['_id']},
                     {
                         '$set': {
+                            'streak': current_streak,
                             'last_active_date': datetime.utcnow(),
                             'updated_at': datetime.utcnow()
                         }

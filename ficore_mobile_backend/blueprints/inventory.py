@@ -316,6 +316,82 @@ def init_inventory_blueprint(mongo, token_required, serialize_doc):
                 'errors': {'general': [str(e)]}
             }), 500
 
+    @inventory_bp.route('/statistics', methods=['GET'])
+    @token_required
+    def get_inventory_statistics(current_user):
+        """Enhanced statistics endpoint with comprehensive metrics"""
+        try:
+            user_id = current_user['_id']
+            
+            # MongoDB aggregation pipeline for comprehensive stats
+            pipeline = [
+                {"$match": {"userId": user_id}},
+                {"$group": {
+                    "_id": None,
+                    "totalCount": {"$sum": 1},
+                    "totalItems": {"$sum": 1},  # Alias for consistency
+                    "totalValue": {"$sum": {"$multiply": ["$currentStock", "$costPrice"]}},
+                    "totalStock": {"$sum": "$currentStock"},
+                    "averageValue": {"$avg": {"$multiply": ["$currentStock", "$costPrice"]}},
+                    "maxValue": {"$max": {"$multiply": ["$currentStock", "$costPrice"]}},
+                    "minValue": {"$min": {"$multiply": ["$currentStock", "$costPrice"]}},
+                    "activeItems": {
+                        "$sum": {"$cond": [{"$eq": ["$status", "active"]}, 1, 0]}
+                    },
+                    "lowStockItems": {
+                        "$sum": {"$cond": [{"$lte": ["$currentStock", "$minimumStock"]}, 1, 0]}
+                    },
+                    "outOfStockItems": {
+                        "$sum": {"$cond": [{"$lte": ["$currentStock", 0]}, 1, 0]}
+                    },
+                    "totalCostValue": {"$sum": {"$multiply": ["$currentStock", "$costPrice"]}},
+                    "totalSellingValue": {"$sum": {"$multiply": ["$currentStock", "$sellingPrice"]}},
+                }}
+            ]
+            
+            result = mongo.db.inventory_items.aggregate(pipeline)
+            statistics = next(result, {})
+            
+            # Calculate additional metrics
+            total_cost_value = float(statistics.get('totalCostValue', 0))
+            total_selling_value = float(statistics.get('totalSellingValue', 0))
+            potential_profit = total_selling_value - total_cost_value
+            profit_margin = (potential_profit / total_selling_value * 100) if total_selling_value > 0 else 0
+            
+            enhanced_stats = {
+                'totalCount': statistics.get('totalCount', 0),
+                'totalItems': statistics.get('totalItems', 0),  # Alias for consistency
+                'totalValue': float(statistics.get('totalValue', 0)),
+                'totalStock': statistics.get('totalStock', 0),
+                'averageValue': float(statistics.get('averageValue', 0)),
+                'maxValue': float(statistics.get('maxValue', 0)),
+                'minValue': float(statistics.get('minValue', 0)),
+                'activeItems': statistics.get('activeItems', 0),
+                'lowStockItems': statistics.get('lowStockItems', 0),
+                'outOfStockItems': statistics.get('outOfStockItems', 0),
+                'totalCostValue': total_cost_value,
+                'totalSellingValue': total_selling_value,
+                'potentialProfit': potential_profit,
+                'profitMargin': round(profit_margin, 2),
+                'dateRange': {
+                    'startDate': datetime.utcnow().replace(day=1).isoformat() + 'Z',
+                    'endDate': datetime.utcnow().isoformat() + 'Z'
+                }
+            }
+            
+            return jsonify({
+                'success': True,
+                'data': enhanced_stats,
+                'message': 'Inventory statistics retrieved successfully'
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve inventory statistics',
+                'errors': {'general': [str(e)]}
+            }), 500
+
     @inventory_bp.route('/summary', methods=['GET'])
     @token_required
     def get_summary(current_user):

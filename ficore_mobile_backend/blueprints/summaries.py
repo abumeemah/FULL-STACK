@@ -190,20 +190,31 @@ def init_summaries_blueprint(mongo, token_required, serialize_doc):
     @summaries_bp.route('/dashboard_summary', methods=['GET'])
     @token_required
     def get_dashboard_summary(current_user):
-        """Get comprehensive dashboard summary"""
+        """Get comprehensive dashboard summary with enhanced calculations"""
         try:
             # Get current month data
             now = datetime.utcnow()
             start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            start_of_year = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
             
             summary_data = {
-                'totalIncome': 0,
-                'totalExpenses': 0,
-                'creditBalance': 0,
+                'totalIncome': 0.0,
+                'totalExpenses': 0.0,
+                'monthlyIncome': 0.0,
+                'monthlyExpenses': 0.0,
+                'yearlyIncome': 0.0,
+                'yearlyExpenses': 0.0,
+                'creditBalance': 0.0,
                 'recentActivitiesCount': 0,
                 'monthlyStats': {
-                    'income': 0,
-                    'expenses': 0
+                    'income': 0.0,
+                    'expenses': 0.0,
+                    'netIncome': 0.0
+                },
+                'yearlyStats': {
+                    'income': 0.0,
+                    'expenses': 0.0,
+                    'netIncome': 0.0
                 }
             }
             
@@ -211,45 +222,384 @@ def init_summaries_blueprint(mongo, token_required, serialize_doc):
             try:
                 user = mongo.db.users.find_one({'_id': current_user['_id']})
                 if user:
-                    summary_data['creditBalance'] = user.get('ficoreCreditBalance', 0.0)
+                    summary_data['creditBalance'] = float(user.get('ficoreCreditBalance', 0.0))
             except Exception as e:
                 print(f"Error fetching user balance: {e}")
             
-            # FIXED: Get income data - ONLY actual received incomes, no projections
+            # Get ALL income data with proper aggregation
             try:
-                now = datetime.utcnow()
-                incomes = list(mongo.db.incomes.find({
-                    'userId': current_user['_id'],
-                    'dateReceived': {'$lte': now}  # Only past and present incomes
-                }))
+                # Total income (all time, only received)
+                total_income_pipeline = [
+                    {
+                        '$match': {
+                            'userId': current_user['_id'],
+                            'dateReceived': {'$lte': now}  # Only received incomes
+                        }
+                    },
+                    {
+                        '$group': {
+                            '_id': None,
+                            'total': {'$sum': '$amount'}
+                        }
+                    }
+                ]
+                total_income_result = list(mongo.db.incomes.aggregate(total_income_pipeline))
+                summary_data['totalIncome'] = float(total_income_result[0]['total']) if total_income_result else 0.0
                 
-                # CRITICAL DEBUG: Log dashboard summary calculation
-                print(f"DEBUG DASHBOARD SUMMARY - User: {current_user['_id']}")
-                print(f"DEBUG: Total incomes for dashboard: {len(incomes)}")
-                for i, inc in enumerate(incomes):
-                    print(f"DEBUG Dashboard Income {i+1}: Amount={inc.get('amount')}, DateReceived={inc.get('dateReceived')}")
+                # Monthly income
+                monthly_income_pipeline = [
+                    {
+                        '$match': {
+                            'userId': current_user['_id'],
+                            'dateReceived': {
+                                '$gte': start_of_month,
+                                '$lte': now
+                            }
+                        }
+                    },
+                    {
+                        '$group': {
+                            '_id': None,
+                            'total': {'$sum': '$amount'}
+                        }
+                    }
+                ]
+                monthly_income_result = list(mongo.db.incomes.aggregate(monthly_income_pipeline))
+                monthly_income = float(monthly_income_result[0]['total']) if monthly_income_result else 0.0
+                summary_data['monthlyIncome'] = monthly_income
+                summary_data['monthlyStats']['income'] = monthly_income
                 
-                # FIXED: Simple sum of actual amounts only
-                total_income = sum(inc.get('amount', 0) for inc in incomes)
-                summary_data['totalIncome'] = total_income
-                print(f"DEBUG: CALCULATED dashboard totalIncome = {total_income}")
+                # Yearly income
+                yearly_income_pipeline = [
+                    {
+                        '$match': {
+                            'userId': current_user['_id'],
+                            'dateReceived': {
+                                '$gte': start_of_year,
+                                '$lte': now
+                            }
+                        }
+                    },
+                    {
+                        '$group': {
+                            '_id': None,
+                            'total': {'$sum': '$amount'}
+                        }
+                    }
+                ]
+                yearly_income_result = list(mongo.db.incomes.aggregate(yearly_income_pipeline))
+                yearly_income = float(yearly_income_result[0]['total']) if yearly_income_result else 0.0
+                summary_data['yearlyIncome'] = yearly_income
+                summary_data['yearlyStats']['income'] = yearly_income
                 
-                monthly_incomes = [inc for inc in incomes if inc.get('dateReceived', datetime.utcnow()) >= start_of_month]
-                monthly_income_total = sum(inc.get('amount', 0) for inc in monthly_incomes)
-                summary_data['monthlyStats']['income'] = monthly_income_total
-                print(f"DEBUG: CALCULATED dashboard monthly income = {monthly_income_total}")
+                print(f"DEBUG ENHANCED SUMMARY - Total Income: {summary_data['totalIncome']}, Monthly: {monthly_income}, Yearly: {yearly_income}")
+                
             except Exception as e:
                 print(f"Error fetching incomes: {e}")
             
-            # Get expense data
+            # Get ALL expense data with proper aggregation
             try:
-                expenses = list(mongo.db.expenses.find({'userId': current_user['_id']}))
-                summary_data['totalExpenses'] = sum(exp.get('amount', 0) for exp in expenses)
+                # Total expenses (all time)
+                total_expense_pipeline = [
+                    {
+                        '$match': {
+                            'userId': current_user['_id']
+                        }
+                    },
+                    {
+                        '$group': {
+                            '_id': None,
+                            'total': {'$sum': '$amount'}
+                        }
+                    }
+                ]
+                total_expense_result = list(mongo.db.expenses.aggregate(total_expense_pipeline))
+                summary_data['totalExpenses'] = float(total_expense_result[0]['total']) if total_expense_result else 0.0
                 
-                monthly_expenses = [exp for exp in expenses if exp.get('date', datetime.utcnow()) >= start_of_month]
-                summary_data['monthlyStats']['expenses'] = sum(exp.get('amount', 0) for exp in monthly_expenses)
+                # Monthly expenses
+                monthly_expense_pipeline = [
+                    {
+                        '$match': {
+                            'userId': current_user['_id'],
+                            'date': {
+                                '$gte': start_of_month,
+                                '$lte': now
+                            }
+                        }
+                    },
+                    {
+                        '$group': {
+                            '_id': None,
+                            'total': {'$sum': '$amount'}
+                        }
+                    }
+                ]
+                monthly_expense_result = list(mongo.db.expenses.aggregate(monthly_expense_pipeline))
+                monthly_expenses = float(monthly_expense_result[0]['total']) if monthly_expense_result else 0.0
+                summary_data['monthlyExpenses'] = monthly_expenses
+                summary_data['monthlyStats']['expenses'] = monthly_expenses
+                
+                # Yearly expenses
+                yearly_expense_pipeline = [
+                    {
+                        '$match': {
+                            'userId': current_user['_id'],
+                            'date': {
+                                '$gte': start_of_year,
+                                '$lte': now
+                            }
+                        }
+                    },
+                    {
+                        '$group': {
+                            '_id': None,
+                            'total': {'$sum': '$amount'}
+                        }
+                    }
+                ]
+                yearly_expense_result = list(mongo.db.expenses.aggregate(yearly_expense_pipeline))
+                yearly_expenses = float(yearly_expense_result[0]['total']) if yearly_expense_result else 0.0
+                summary_data['yearlyExpenses'] = yearly_expenses
+                summary_data['yearlyStats']['expenses'] = yearly_expenses
+                
+                print(f"DEBUG ENHANCED SUMMARY - Total Expenses: {summary_data['totalExpenses']}, Monthly: {monthly_expenses}, Yearly: {yearly_expenses}")
+                
             except Exception as e:
                 print(f"Error fetching expenses: {e}")
+            
+            # Calculate net income
+            summary_data['monthlyStats']['netIncome'] = summary_data['monthlyStats']['income'] - summary_data['monthlyStats']['expenses']
+            summary_data['yearlyStats']['netIncome'] = summary_data['yearlyStats']['income'] - summary_data['yearlyStats']['expenses']
+            
+            # CRITICAL FIX: Get debtors data with proper aggregation
+            try:
+                debtors_pipeline = [
+                    {
+                        '$match': {
+                            'userId': current_user['_id']
+                        }
+                    },
+                    {
+                        '$group': {
+                            '_id': None,
+                            'totalCustomers': {'$sum': 1},
+                            'totalOutstanding': {'$sum': '$remainingDebt'},
+                            'overdueCustomers': {
+                                '$sum': {'$cond': [{'$eq': ['$status', 'overdue']}, 1, 0]}
+                            },
+                            'overdueAmount': {
+                                '$sum': {'$cond': [
+                                    {'$eq': ['$status', 'overdue']}, 
+                                    '$remainingDebt', 
+                                    0
+                                ]}
+                            }
+                        }
+                    }
+                ]
+                debtors_result = list(mongo.db.debtors.aggregate(debtors_pipeline))
+                
+                if debtors_result:
+                    debtors_data = debtors_result[0]
+                    summary_data['debtorsData'] = {
+                        'totalCustomers': int(debtors_data.get('totalCustomers', 0)),
+                        'totalOutstanding': float(debtors_data.get('totalOutstanding', 0)),
+                        'overdueCustomers': int(debtors_data.get('overdueCustomers', 0)),
+                        'overdueAmount': float(debtors_data.get('overdueAmount', 0))
+                    }
+                else:
+                    summary_data['debtorsData'] = {
+                        'totalCustomers': 0,
+                        'totalOutstanding': 0.0,
+                        'overdueCustomers': 0,
+                        'overdueAmount': 0.0
+                    }
+                
+                print(f"DEBUG ENHANCED SUMMARY - Debtors: {summary_data['debtorsData']}")
+                
+            except Exception as e:
+                print(f"Error fetching debtors data: {e}")
+                summary_data['debtorsData'] = {
+                    'totalCustomers': 0,
+                    'totalOutstanding': 0.0,
+                    'overdueCustomers': 0,
+                    'overdueAmount': 0.0
+                }
+            
+            # ENHANCED: Get creditors data with proper aggregation
+            try:
+                creditors_pipeline = [
+                    {
+                        '$match': {
+                            'userId': current_user['_id']
+                        }
+                    },
+                    {
+                        '$group': {
+                            '_id': None,
+                            'totalVendors': {'$sum': 1},
+                            'totalOwed': {'$sum': '$totalOwed'},
+                            'totalOutstanding': {'$sum': '$remainingOwed'},
+                            'overdueVendors': {
+                                '$sum': {'$cond': [{'$eq': ['$status', 'overdue']}, 1, 0]}
+                            },
+                            'overdueAmount': {
+                                '$sum': {'$cond': [
+                                    {'$eq': ['$status', 'overdue']}, 
+                                    '$remainingOwed', 
+                                    0
+                                ]}
+                            }
+                        }
+                    }
+                ]
+                creditors_result = list(mongo.db.creditors.aggregate(creditors_pipeline))
+                
+                if creditors_result:
+                    creditors_data = creditors_result[0]
+                    summary_data['creditorsData'] = {
+                        'totalVendors': int(creditors_data.get('totalVendors', 0)),
+                        'totalOwed': float(creditors_data.get('totalOwed', 0)),
+                        'totalOutstanding': float(creditors_data.get('totalOutstanding', 0)),
+                        'overdueVendors': int(creditors_data.get('overdueVendors', 0)),
+                        'overdueAmount': float(creditors_data.get('overdueAmount', 0))
+                    }
+                else:
+                    summary_data['creditorsData'] = {
+                        'totalVendors': 0,
+                        'totalOwed': 0.0,
+                        'totalOutstanding': 0.0,
+                        'overdueVendors': 0,
+                        'overdueAmount': 0.0
+                    }
+                
+                print(f"DEBUG ENHANCED SUMMARY - Creditors: {summary_data['creditorsData']}")
+                
+            except Exception as e:
+                print(f"Error fetching creditors data: {e}")
+                summary_data['creditorsData'] = {
+                    'totalVendors': 0,
+                    'totalOwed': 0.0,
+                    'totalOutstanding': 0.0,
+                    'overdueVendors': 0,
+                    'overdueAmount': 0.0
+                }
+            
+            # ENHANCED: Get inventory data with proper aggregation
+            try:
+                inventory_pipeline = [
+                    {
+                        '$match': {
+                            'userId': current_user['_id']
+                        }
+                    },
+                    {
+                        '$group': {
+                            '_id': None,
+                            'totalItems': {'$sum': 1},
+                            'totalValue': {'$sum': {'$multiply': ['$currentStock', '$costPrice']}},
+                            'totalStock': {'$sum': '$currentStock'},
+                            'lowStockItems': {
+                                '$sum': {'$cond': [{'$lte': ['$currentStock', '$minimumStock']}, 1, 0]}
+                            },
+                            'outOfStockItems': {
+                                '$sum': {'$cond': [{'$lte': ['$currentStock', 0]}, 1, 0]}
+                            }
+                        }
+                    }
+                ]
+                inventory_result = list(mongo.db.inventory_items.aggregate(inventory_pipeline))
+                
+                if inventory_result:
+                    inventory_data = inventory_result[0]
+                    summary_data['inventoryData'] = {
+                        'totalItems': int(inventory_data.get('totalItems', 0)),
+                        'totalValue': float(inventory_data.get('totalValue', 0)),
+                        'totalStock': int(inventory_data.get('totalStock', 0)),
+                        'lowStockItems': int(inventory_data.get('lowStockItems', 0)),
+                        'outOfStockItems': int(inventory_data.get('outOfStockItems', 0))
+                    }
+                else:
+                    summary_data['inventoryData'] = {
+                        'totalItems': 0,
+                        'totalValue': 0.0,
+                        'totalStock': 0,
+                        'lowStockItems': 0,
+                        'outOfStockItems': 0
+                    }
+                
+                print(f"DEBUG ENHANCED SUMMARY - Inventory: {summary_data['inventoryData']}")
+                
+            except Exception as e:
+                print(f"Error fetching inventory data: {e}")
+                summary_data['inventoryData'] = {
+                    'totalItems': 0,
+                    'totalValue': 0.0,
+                    'totalStock': 0,
+                    'lowStockItems': 0,
+                    'outOfStockItems': 0
+                }
+            
+            # ENHANCED: Get inventory data with proper aggregation
+            try:
+                inventory_pipeline = [
+                    {
+                        '$match': {
+                            'userId': current_user['_id']
+                        }
+                    },
+                    {
+                        '$group': {
+                            '_id': None,
+                            'totalItems': {'$sum': 1},
+                            'totalValue': {'$sum': {'$multiply': ['$currentStock', '$costPrice']}},
+                            'totalStock': {'$sum': '$currentStock'},
+                            'lowStockItems': {
+                                '$sum': {'$cond': [{'$lte': ['$currentStock', '$minimumStock']}, 1, 0]}
+                            },
+                            'outOfStockItems': {
+                                '$sum': {'$cond': [{'$lte': ['$currentStock', 0]}, 1, 0]}
+                            },
+                            'activeItems': {
+                                '$sum': {'$cond': [{'$eq': ['$status', 'active']}, 1, 0]}
+                            }
+                        }
+                    }
+                ]
+                inventory_result = list(mongo.db.inventory_items.aggregate(inventory_pipeline))
+                
+                if inventory_result:
+                    inventory_data = inventory_result[0]
+                    summary_data['inventoryData'] = {
+                        'totalItems': int(inventory_data.get('totalItems', 0)),
+                        'totalValue': float(inventory_data.get('totalValue', 0)),
+                        'totalStock': int(inventory_data.get('totalStock', 0)),
+                        'lowStockItems': int(inventory_data.get('lowStockItems', 0)),
+                        'outOfStockItems': int(inventory_data.get('outOfStockItems', 0)),
+                        'activeItems': int(inventory_data.get('activeItems', 0))
+                    }
+                else:
+                    summary_data['inventoryData'] = {
+                        'totalItems': 0,
+                        'totalValue': 0.0,
+                        'totalStock': 0,
+                        'lowStockItems': 0,
+                        'outOfStockItems': 0,
+                        'activeItems': 0
+                    }
+                
+                print(f"DEBUG ENHANCED SUMMARY - Inventory: {summary_data['inventoryData']}")
+                
+            except Exception as e:
+                print(f"Error fetching inventory data: {e}")
+                summary_data['inventoryData'] = {
+                    'totalItems': 0,
+                    'totalValue': 0.0,
+                    'totalStock': 0,
+                    'lowStockItems': 0,
+                    'outOfStockItems': 0,
+                    'activeItems': 0
+                }
             
             # Get recent activities count
             try:
@@ -267,10 +617,12 @@ def init_summaries_blueprint(mongo, token_required, serialize_doc):
             except Exception as e:
                 print(f"Error counting recent activities: {e}")
 
+            print(f"DEBUG FINAL SUMMARY DATA: {summary_data}")
+
             return jsonify({
                 'success': True,
                 'data': summary_data,
-                'message': 'Dashboard summary retrieved successfully'
+                'message': 'Enhanced dashboard summary retrieved successfully'
             })
 
         except Exception as e:

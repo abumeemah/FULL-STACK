@@ -1903,4 +1903,126 @@ def init_debtors_blueprint(mongo, token_required, serialize_doc):
                 'errors': {'general': [str(e)]}
             }), 500
 
+    @debtors_bp.route('/statistics', methods=['GET'])
+    @token_required
+    def get_debtors_statistics(current_user):
+        """Get comprehensive debtors statistics using aggregation"""
+        try:
+            # Get date range parameters
+            start_date_str = request.args.get('start_date')
+            end_date_str = request.args.get('end_date')
+            
+            # Default to current month if no dates provided
+            now = datetime.utcnow()
+            if start_date_str:
+                start_date = datetime.fromisoformat(start_date_str.replace('Z', ''))
+            else:
+                start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            
+            if end_date_str:
+                end_date = datetime.fromisoformat(end_date_str.replace('Z', ''))
+            else:
+                end_date = now
+            
+            # Get comprehensive debtors statistics using aggregation
+            statistics_pipeline = [
+                {
+                    '$match': {
+                        'userId': current_user['_id']
+                    }
+                },
+                {
+                    '$group': {
+                        '_id': None,
+                        'totalCustomers': {'$sum': 1},
+                        'totalDebt': {'$sum': '$totalDebt'},
+                        'totalPaid': {'$sum': '$paidAmount'},
+                        'totalOutstanding': {'$sum': '$remainingDebt'},
+                        'activeCustomers': {
+                            '$sum': {'$cond': [{'$eq': ['$status', 'active']}, 1, 0]}
+                        },
+                        'overdueCustomers': {
+                            '$sum': {'$cond': [{'$eq': ['$status', 'overdue']}, 1, 0]}
+                        },
+                        'paidCustomers': {
+                            '$sum': {'$cond': [{'$eq': ['$status', 'paid']}, 1, 0]}
+                        },
+                        'overdueAmount': {
+                            '$sum': {'$cond': [
+                                {'$eq': ['$status', 'overdue']}, 
+                                '$remainingDebt', 
+                                0
+                            ]}
+                        },
+                        'averageDebt': {'$avg': '$totalDebt'},
+                        'maxDebt': {'$max': '$totalDebt'},
+                        'minDebt': {'$min': '$totalDebt'}
+                    }
+                }
+            ]
+            
+            stats_result = list(mongo.db.debtors.aggregate(statistics_pipeline))
+            
+            if stats_result:
+                stats = stats_result[0]
+                
+                # Calculate additional metrics
+                total_debt = float(stats.get('totalDebt', 0))
+                total_paid = float(stats.get('totalPaid', 0))
+                collection_rate = (total_paid / total_debt * 100) if total_debt > 0 else 0
+                
+                statistics_data = {
+                    'totalCustomers': int(stats.get('totalCustomers', 0)),
+                    'activeCustomers': int(stats.get('activeCustomers', 0)),
+                    'overdueCustomers': int(stats.get('overdueCustomers', 0)),
+                    'paidCustomers': int(stats.get('paidCustomers', 0)),
+                    'totalDebt': total_debt,
+                    'totalPaid': total_paid,
+                    'totalOutstanding': float(stats.get('totalOutstanding', 0)),
+                    'overdueAmount': float(stats.get('overdueAmount', 0)),
+                    'averageDebt': float(stats.get('averageDebt', 0)),
+                    'maxDebt': float(stats.get('maxDebt', 0)),
+                    'minDebt': float(stats.get('minDebt', 0)),
+                    'collectionRate': round(collection_rate, 2),
+                    'dateRange': {
+                        'startDate': start_date.isoformat() + 'Z',
+                        'endDate': end_date.isoformat() + 'Z'
+                    }
+                }
+            else:
+                statistics_data = {
+                    'totalCustomers': 0,
+                    'activeCustomers': 0,
+                    'overdueCustomers': 0,
+                    'paidCustomers': 0,
+                    'totalDebt': 0.0,
+                    'totalPaid': 0.0,
+                    'totalOutstanding': 0.0,
+                    'overdueAmount': 0.0,
+                    'averageDebt': 0.0,
+                    'maxDebt': 0.0,
+                    'minDebt': 0.0,
+                    'collectionRate': 0.0,
+                    'dateRange': {
+                        'startDate': start_date.isoformat() + 'Z',
+                        'endDate': end_date.isoformat() + 'Z'
+                    }
+                }
+            
+            print(f"DEBUG DEBTORS STATISTICS: {statistics_data}")
+            
+            return jsonify({
+                'success': True,
+                'data': statistics_data,
+                'message': 'Debtors statistics retrieved successfully'
+            })
+            
+        except Exception as e:
+            print(f"Error in get_debtors_statistics: {e}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve debtors statistics',
+                'errors': {'general': [str(e)]}
+            }), 500
+
     return debtors_bp
