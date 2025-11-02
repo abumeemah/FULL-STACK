@@ -6,7 +6,6 @@ import io
 from collections import defaultdict
 from utils.payment_utils import normalize_sales_type, validate_sales_type
 
-
 def init_income_blueprint(mongo, token_required, serialize_doc):
     """Initialize the income blueprint with database and auth decorator"""
     income_bp = Blueprint('income', __name__, url_prefix='/income')
@@ -620,78 +619,113 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
                 'errors': {'general': [str(e)]}
             }), 500
 
-    # FIXED: Only ONE /statistics endpoint (the advanced aggregation version)
     @income_bp.route('/statistics', methods=['GET'])
     @token_required
     def get_income_statistics(current_user):
-        """Get comprehensive income statistics"""
+        """Get comprehensive income statistics for frontend data sourcing"""
         try:
             # Get date range parameters
             start_date_str = request.args.get('start_date')
             end_date_str = request.args.get('end_date')
             
-            # Default to current month if no dates provided
+            # Default to current year if no dates provided
             now = datetime.utcnow()
             if start_date_str:
                 start_date = datetime.fromisoformat(start_date_str.replace('Z', ''))
             else:
-                start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
             
             if end_date_str:
                 end_date = datetime.fromisoformat(end_date_str.replace('Z', ''))
             else:
                 end_date = now
             
-            # Get income statistics using aggregation
-            statistics_pipeline = [
-                {
-                    '$match': {
-                        'userId': current_user['_id'],
-                        'dateReceived': {
-                            '$gte': start_date,
-                            '$lte': end_date
-                        }
-                    }
+            # Get all income data for the user within date range
+            incomes = list(mongo.db.incomes.find({
+                'userId': current_user['_id'],
+                'dateReceived': {
+                    '$gte': start_date,
+                    '$lte': end_date
+                }
+            }))
+            
+            # Calculate comprehensive statistics
+            total_income = sum(income.get('amount', 0) for income in incomes)
+            total_count = len(incomes)
+            
+            # Monthly average calculation
+            months_in_range = max(1, (end_date.year - start_date.year) * 12 + end_date.month - start_date.month + 1)
+            monthly_average = total_income / months_in_range if months_in_range > 0 else 0
+            
+            # Yearly projection based on current monthly average
+            yearly_projection = monthly_average * 12
+            
+            # Category breakdown
+            category_breakdown = defaultdict(float)
+            for income in incomes:
+                category = income.get('category', 'other')
+                category_breakdown[category] += income.get('amount', 0)
+            
+            # Source breakdown
+            source_breakdown = defaultdict(float)
+            for income in incomes:
+                source = income.get('source', 'unknown')
+                source_breakdown[source] += income.get('amount', 0)
+            
+            # Frequency breakdown (simplified since we removed recurring logic)
+            frequency_breakdown = {'one_time': total_income}
+            
+            # Calculate trends (monthly data for the last 12 months)
+            trends = []
+            for i in range(12):
+                month_start = (now - timedelta(days=30*i)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                month_incomes = [inc for inc in incomes if month_start <= inc.get('dateReceived', now) <= month_end]
+                month_total = sum(inc.get('amount', 0) for inc in month_incomes)
+                trends.append({
+                    'period': month_start.strftime('%Y-%m'),
+                    'amount': month_total,
+                    'count': len(month_incomes)
+                })
+            trends.reverse()  # Chronological order
+            
+            # Growth rate calculation (current month vs previous month)
+            current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            prev_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
+            prev_month_end = current_month_start - timedelta(days=1)
+            
+            current_month_incomes = [inc for inc in incomes if inc.get('dateReceived', now) >= current_month_start]
+            prev_month_incomes = [inc for inc in incomes if prev_month_start <= inc.get('dateReceived', now) <= prev_month_end]
+            
+            current_month_total = sum(inc.get('amount', 0) for inc in current_month_incomes)
+            prev_month_total = sum(inc.get('amount', 0) for inc in prev_month_incomes)
+            
+            growth_rate = 0
+            if prev_month_total > 0:
+                growth_rate = ((current_month_total - prev_month_total) / prev_month_total) * 100
+            
+            # Top category and source
+            top_category = max(category_breakdown.items(), key=lambda x: x[1])[0] if category_breakdown else 'other'
+            top_source = max(source_breakdown.items(), key=lambda x: x[1])[0] if source_breakdown else 'unknown'
+            
+            # Prepare response data matching frontend expectations
+            statistics_data = {
+                'total_income': float(total_income),
+                'monthly_average': float(monthly_average),
+                'yearly_projection': float(yearly_projection),
+                'category_breakdown': dict(category_breakdown),
+                'source_breakdown': dict(source_breakdown),
+                'frequency_breakdown': dict(frequency_breakdown),
+                'trends': trends,
+                'growth_rate': float(growth_rate),
+                'top_category': top_category,
+                'top_source': top_source,
+                'date_range': {
+                    'start_date': start_date.isoformat() + 'Z',
+                    'end_date': end_date.isoformat() + 'Z'
                 },
-                {
-                    '$group': {
-                        '_id': None,
-                        'totalAmount': {'$sum': '$amount'},
-                        'totalCount': {'$sum': 1},
-                        'averageAmount': {'$avg': '$amount'},
-                        'maxAmount': {'$max': '$amount'},
-                        'minAmount': {'$min': '$amount'}
-                    }
-                }
-            ]
-            
-            stats_result = list(mongo.db.incomes.aggregate(statistics_pipeline))
-            
-            if stats_result:
-                stats = stats_result[0]
-                statistics_data = {
-                    'totalAmount': float(stats.get('totalAmount', 0)),
-                    'totalCount': int(stats.get('totalCount', 0)),
-                    'averageAmount': float(stats.get('averageAmount', 0)),
-                    'maxAmount': float(stats.get('maxAmount', 0)),
-                    'minAmount': float(stats.get('minAmount', 0)),
-                    'dateRange': {
-                        'startDate': start_date.isoformat() + 'Z',
-                        'endDate': end_date.isoformat() + 'Z'
-                    }
-                }
-            else:
-                statistics_data = {
-                    'totalAmount': 0.0,
-                    'totalCount': 0,
-                    'averageAmount': 0.0,
-                    'maxAmount': 0.0,
-                    'minAmount': 0.0,
-                    'dateRange': {
-                        'startDate': start_date.isoformat() + 'Z',
-                        'endDate': end_date.isoformat() + 'Z'
-                    }
-                }
+                'total_count': total_count
+            }
             
             return jsonify({
                 'success': True,
