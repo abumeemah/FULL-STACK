@@ -6,6 +6,7 @@ import io
 from collections import defaultdict
 from utils.payment_utils import normalize_sales_type, validate_sales_type
 
+
 def init_income_blueprint(mongo, token_required, serialize_doc):
     """Initialize the income blueprint with database and auth decorator"""
     income_bp = Blueprint('income', __name__, url_prefix='/income')
@@ -619,96 +620,7 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
                 'errors': {'general': [str(e)]}
             }), 500
 
-    @income_bp.route('/statistics', methods=['GET'])
-    @token_required
-    def get_income_statistics(current_user):
-        try:
-            # Validate database connection
-            if mongo is None or mongo.db is None:
-                return jsonify({
-                    'success': False,
-                    'message': 'Database connection error',
-                    'errors': {'general': ['Database not available']}
-                }), 500
-
-            # Get query parameters
-            start_date = request.args.get('start_date')
-            end_date = request.args.get('end_date')
-            group_by = request.args.get('group_by', 'month')  # Default to month
-
-            # Validate group_by parameter
-            valid_groups = ['month', 'category', 'source']
-            if group_by not in valid_groups:
-                return jsonify({
-                    'success': False,
-                    'message': 'Invalid group_by parameter',
-                    'errors': {'group_by': [f'Must be one of: {", ".join(valid_groups)}']}
-                }), 400
-
-            # Build query
-            query = {'userId': current_user['_id']}
-            if start_date or end_date:
-                date_query = {}
-                if start_date:
-                    date_query['$gte'] = datetime.fromisoformat(start_date.replace('Z', ''))
-                if end_date:
-                    date_query['$lte'] = datetime.fromisoformat(end_date.replace('Z', ''))
-                query['dateReceived'] = date_query
-
-            # Get income data
-            incomes = list(mongo.db.incomes.find(query))
-
-            # Calculate statistics
-            statistics = defaultdict(float)
-            total = 0
-            count = len(incomes)
-
-            if group_by == 'month':
-                for income in incomes:
-                    if income.get('dateReceived'):
-                        month_key = income['dateReceived'].strftime('%Y-%m')
-                        statistics[month_key] += income.get('amount', 0)
-                        total += income.get('amount', 0)
-            elif group_by == 'category':
-                for income in incomes:
-                    category = income.get('category', 'Unknown')
-                    statistics[category] += income.get('amount', 0)
-                    total += income.get('amount', 0)
-            elif group_by == 'source':
-                for income in incomes:
-                    source = income.get('source', 'Unknown')
-                    statistics[source] += income.get('amount', 0)
-                    total += income.get('amount', 0)
-
-            # Calculate average
-            average = total / count if count > 0 else 0
-
-            # Prepare summary
-            summary = {
-                'total': total,
-                'average': average,
-                'count': count,
-                'start_date': start_date or datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat() + 'Z',
-                'end_date': end_date or datetime.utcnow().isoformat() + 'Z',
-                'group_by': group_by
-            }
-
-            return jsonify({
-                'success': True,
-                'data': {
-                    'statistics': dict(statistics),
-                    'summary': summary
-                },
-                'message': 'Income statistics retrieved successfully'
-            })
-
-        except Exception as e:
-            return jsonify({
-                'success': False,
-                'message': 'Failed to retrieve income statistics',
-                'errors': {'general': [str(e)]}
-            }), 500
-
+    # FIXED: Only ONE /statistics endpoint (the advanced aggregation version)
     @income_bp.route('/statistics', methods=['GET'])
     @token_required
     def get_income_statistics(current_user):
@@ -796,4 +708,3 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
             }), 500
 
     return income_bp
-
