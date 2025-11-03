@@ -1746,6 +1746,19 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                         'grantReason': reason
                     }}
                 )
+                
+                # Update user subscription fields to sync with subscription collection
+                mongo.db.users.update_one(
+                    {'_id': ObjectId(user_id)},
+                    {'$set': {
+                        'isSubscribed': True,
+                        'subscriptionType': plan_id,
+                        'subscriptionStartDate': start_date,
+                        'subscriptionEndDate': end_date,
+                        'subscriptionAutoRenew': auto_renew,
+                        'lastUpdated': datetime.utcnow()
+                    }}
+                )
             else:
                 # Create new subscription
                 subscription_data = {
@@ -1766,6 +1779,19 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                     'grantReason': reason
                 }
                 mongo.db.subscriptions.insert_one(subscription_data)
+
+            # Update user subscription fields to sync with subscription collection
+            mongo.db.users.update_one(
+                {'_id': ObjectId(user_id)},
+                {'$set': {
+                    'isSubscribed': True,
+                    'subscriptionType': plan_id,
+                    'subscriptionStartDate': start_date,
+                    'subscriptionEndDate': end_date,
+                    'subscriptionAutoRenew': auto_renew,
+                    'lastUpdated': datetime.utcnow()
+                }}
+            )
 
             # Create subscription transaction record
             transaction = {
@@ -1856,6 +1882,22 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                     {'$set': update_data}
                 )
 
+                # Update user subscription fields to sync with subscription collection
+                updated_subscription = mongo.db.subscriptions.find_one({'userId': ObjectId(user_id)})
+                if updated_subscription:
+                    user_update_data = {
+                        'isSubscribed': updated_subscription.get('isActive', False),
+                        'subscriptionType': updated_subscription.get('planId'),
+                        'subscriptionStartDate': updated_subscription.get('startDate'),
+                        'subscriptionEndDate': updated_subscription.get('endDate'),
+                        'subscriptionAutoRenew': updated_subscription.get('autoRenew', False),
+                        'lastUpdated': datetime.utcnow()
+                    }
+                    mongo.db.users.update_one(
+                        {'_id': ObjectId(user_id)},
+                        {'$set': user_update_data}
+                    )
+
                 # Log the update
                 if 'extendDays' in data:
                     transaction = {
@@ -1930,6 +1972,19 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                     'cancelledBy': current_user['_id'],
                     'cancellationReason': reason,
                     'updatedAt': datetime.utcnow()
+                }}
+            )
+
+            # Update user subscription fields to sync with subscription collection
+            mongo.db.users.update_one(
+                {'_id': ObjectId(user_id)},
+                {'$set': {
+                    'isSubscribed': False,
+                    'subscriptionType': None,
+                    'subscriptionStartDate': None,
+                    'subscriptionEndDate': None,
+                    'subscriptionAutoRenew': False,
+                    'lastUpdated': datetime.utcnow()
                 }}
             )
 
