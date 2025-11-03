@@ -8,6 +8,33 @@ import re
 def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
     admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
+    # ===== HEALTH CHECK ENDPOINT =====
+
+    @admin_bp.route('/health', methods=['GET'])
+    @token_required
+    @admin_required
+    def admin_health_check(current_user):
+        """Simple health check for admin endpoints"""
+        try:
+            # Test database connection
+            mongo.db.users.count_documents({}, limit=1)
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'status': 'healthy',
+                    'timestamp': datetime.utcnow().isoformat() + 'Z',
+                    'admin_user': current_user.get('displayName', 'Admin')
+                },
+                'message': 'Admin service is healthy'
+            })
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Admin service health check failed',
+                'errors': {'general': [str(e)]}
+            }), 500
+
     # ===== DASHBOARD & ANALYTICS ENDPOINTS =====
 
     @admin_bp.route('/dashboard/stats', methods=['GET'])
@@ -577,6 +604,90 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                 'errors': {'general': [str(e)]}
             }), 500
 
+    @admin_bp.route('/users/<user_id>/transactions', methods=['GET'])
+    @token_required
+    @admin_required
+    def get_user_transactions(current_user, user_id):
+        """Get user's credit transactions (admin only)"""
+        try:
+            # Find user
+            user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+            if not user:
+                return jsonify({
+                    'success': False,
+                    'message': 'User not found'
+                }), 404
+
+            # Get pagination parameters
+            page = int(request.args.get('page', 1))
+            limit = int(request.args.get('limit', 50))
+            status = request.args.get('status', '')
+            transaction_type = request.args.get('type', '')
+
+            # Build query
+            query = {'userId': ObjectId(user_id)}
+            if status:
+                query['status'] = status
+            if transaction_type:
+                query['type'] = transaction_type
+
+            # Get total count
+            total = mongo.db.credit_transactions.count_documents(query)
+            
+            # Get transactions with pagination
+            skip = (page - 1) * limit
+            transactions = list(mongo.db.credit_transactions.find(query)
+                              .sort('createdAt', -1)
+                              .skip(skip)
+                              .limit(limit))
+            
+            # Serialize transactions
+            transaction_data = []
+            for transaction in transactions:
+                trans_data = serialize_doc(transaction.copy())
+                
+                # Format dates
+                trans_data['createdAt'] = transaction.get('createdAt', datetime.utcnow()).isoformat() + 'Z'
+                if transaction.get('updatedAt'):
+                    trans_data['updatedAt'] = transaction['updatedAt'].isoformat() + 'Z'
+                if transaction.get('processedAt'):
+                    trans_data['processedAt'] = transaction['processedAt'].isoformat() + 'Z'
+                
+                # Add processed by user info if available
+                if transaction.get('processedBy'):
+                    processed_by_user = mongo.db.users.find_one({'_id': transaction['processedBy']})
+                    if processed_by_user:
+                        trans_data['processedByUser'] = {
+                            'id': str(processed_by_user['_id']),
+                            'displayName': processed_by_user.get('displayName', 'Admin'),
+                            'email': processed_by_user.get('email', '')
+                        }
+                
+                transaction_data.append(trans_data)
+
+            return jsonify({
+                'success': True,
+                'data': {
+                    'transactions': transaction_data,
+                    'pagination': {
+                        'page': page,
+                        'limit': limit,
+                        'total': total,
+                        'pages': (total + limit - 1) // limit,
+                        'hasNext': page * limit < total,
+                        'hasPrev': page > 1
+                    }
+                },
+                'message': 'User transactions retrieved successfully'
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve user transactions',
+                'errors': {'general': [str(e)]}
+            }), 500
+
     @admin_bp.route('/users/<user_id>/activity', methods=['GET'])
     @token_required
     @admin_required
@@ -944,6 +1055,7 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                         'balanceBefore': current_balance,
                         'balanceAfter': new_balance,
                         'processedBy': current_user['_id'],
+                        'processedAt': datetime.utcnow(),
                         'updatedAt': datetime.utcnow(),
                         'metadata': {
                             'requestType': 'topup',
@@ -1028,9 +1140,16 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                 {
                     '$set': {
                         'status': 'rejected',
+                        'processedBy': current_user['_id'],
+                        'processedAt': datetime.utcnow(),
                         'updatedAt': datetime.utcnow(),
                         'rejectionReason': rejection_reason,
-                        'description': f'Credit top-up rejected for {credit_amount:.1f} FCs ({naira_amount:.0f} NGN) - {credit_request["paymentMethod"]}'
+                        'description': f'Credit top-up rejected for {credit_amount:.1f} FCs ({naira_amount:.0f} NGN) - {credit_request["paymentMethod"]}',
+                        'metadata': {
+                            'rejectedBy': current_user.get('displayName', 'Admin'),
+                            'adminNotes': admin_notes,
+                            'rejectionReason': rejection_reason
+                        }
                     }
                 }
             )
@@ -1128,7 +1247,7 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                 credit_amount = credit_request['amount']
                 
                 mongo.db.credit_transactions.update_one(
-                    {'requestId': request_id},
+                    {'requestId': request_id, 'type': 'credit'},
                     {
                         '$set': {
                             'status': 'completed',
@@ -1137,7 +1256,9 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                             'balanceAfter': new_balance,
                             'processedAt': datetime.utcnow(),
                             'processedBy': current_user['_id'],
+                            'updatedAt': datetime.utcnow(),
                             'metadata': {
+                                'requestType': 'topup',
                                 'approvedBy': current_user.get('displayName', 'Admin'),
                                 'adminNotes': comments,
                                 'paymentMethod': credit_request['paymentMethod'],
@@ -1411,4 +1532,458 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                 'errors': {'general': [str(e)]}
             }), 500
 
-    return admin_bp
+    # ===== SUBSCRIPTION MANAGEMENT ENDPOINTS =====
+
+    @admin_bp.route('/users/<user_id>/subscription', methods=['GET'])
+    @token_required
+    @admin_required
+    def get_user_subscription(current_user, user_id):
+        """Get user's subscription status (admin only)"""
+        try:
+            # Find user
+            user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+            if not user:
+                return jsonify({
+                    'success': False,
+                    'message': 'User not found'
+                }), 404
+
+            # Get user's subscription
+            subscription = mongo.db.subscriptions.find_one({'userId': ObjectId(user_id)})
+            
+            if not subscription:
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'isSubscribed': False,
+                        'subscriptionType': None,
+                        'startDate': None,
+                        'endDate': None,
+                        'autoRenew': False,
+                        'daysRemaining': None,
+                        'status': 'inactive'
+                    },
+                    'message': 'User has no active subscription'
+                })
+
+            # Calculate days remaining
+            days_remaining = None
+            if subscription.get('endDate'):
+                end_date = subscription['endDate']
+                days_remaining = max(0, (end_date - datetime.utcnow()).days)
+
+            # Determine status
+            status = 'active'
+            if subscription.get('endDate') and subscription['endDate'] < datetime.utcnow():
+                status = 'expired'
+            elif subscription.get('status') == 'cancelled':
+                status = 'cancelled'
+
+            subscription_data = {
+                'isSubscribed': subscription.get('isActive', False),
+                'subscriptionType': subscription.get('planId'),
+                'startDate': subscription.get('startDate').isoformat() + 'Z' if subscription.get('startDate') else None,
+                'endDate': subscription.get('endDate').isoformat() + 'Z' if subscription.get('endDate') else None,
+                'autoRenew': subscription.get('autoRenew', False),
+                'daysRemaining': days_remaining,
+                'status': status,
+                'planName': subscription.get('planName'),
+                'amount': subscription.get('amount', 0.0),
+                'paymentMethod': subscription.get('paymentMethod'),
+                'createdAt': subscription.get('createdAt').isoformat() + 'Z' if subscription.get('createdAt') else None
+            }
+
+            return jsonify({
+                'success': True,
+                'data': subscription_data,
+                'message': 'User subscription retrieved successfully'
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve user subscription',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @admin_bp.route('/users/<user_id>/subscription', methods=['POST'])
+    @token_required
+    @admin_required
+    def create_user_subscription(current_user, user_id):
+        """Create or update user subscription (admin only)"""
+        try:
+            data = request.get_json()
+            
+            required_fields = ['planId', 'durationDays']
+            for field in required_fields:
+                if field not in data:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Missing required field: {field}'
+                    }), 400
+
+            # Find user
+            user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+            if not user:
+                return jsonify({
+                    'success': False,
+                    'message': 'User not found'
+                }), 404
+
+            plan_id = data['planId']
+            duration_days = int(data['durationDays'])
+            auto_renew = data.get('autoRenew', False)
+            amount = float(data.get('amount', 0.0))
+            reason = data.get('reason', 'Admin subscription grant')
+
+            # Calculate dates
+            start_date = datetime.utcnow()
+            end_date = start_date + timedelta(days=duration_days)
+
+            # Check if user already has a subscription
+            existing_subscription = mongo.db.subscriptions.find_one({'userId': ObjectId(user_id)})
+            
+            if existing_subscription:
+                # Update existing subscription
+                mongo.db.subscriptions.update_one(
+                    {'userId': ObjectId(user_id)},
+                    {'$set': {
+                        'planId': plan_id,
+                        'planName': data.get('planName', plan_id),
+                        'startDate': start_date,
+                        'endDate': end_date,
+                        'isActive': True,
+                        'autoRenew': auto_renew,
+                        'amount': amount,
+                        'paymentMethod': 'admin_grant',
+                        'status': 'active',
+                        'updatedAt': datetime.utcnow(),
+                        'grantedBy': current_user['_id'],
+                        'grantReason': reason
+                    }}
+                )
+            else:
+                # Create new subscription
+                subscription_data = {
+                    '_id': ObjectId(),
+                    'userId': ObjectId(user_id),
+                    'planId': plan_id,
+                    'planName': data.get('planName', plan_id),
+                    'startDate': start_date,
+                    'endDate': end_date,
+                    'isActive': True,
+                    'autoRenew': auto_renew,
+                    'amount': amount,
+                    'paymentMethod': 'admin_grant',
+                    'status': 'active',
+                    'createdAt': datetime.utcnow(),
+                    'updatedAt': datetime.utcnow(),
+                    'grantedBy': current_user['_id'],
+                    'grantReason': reason
+                }
+                mongo.db.subscriptions.insert_one(subscription_data)
+
+            # Create subscription transaction record
+            transaction = {
+                '_id': ObjectId(),
+                'userId': ObjectId(user_id),
+                'subscriptionId': existing_subscription['_id'] if existing_subscription else subscription_data['_id'],
+                'type': 'subscription_grant',
+                'amount': amount,
+                'description': f'Admin subscription grant: {plan_id} for {duration_days} days - {reason}',
+                'status': 'completed',
+                'processedBy': current_user['_id'],
+                'createdAt': datetime.utcnow(),
+                'metadata': {
+                    'grantedBy': current_user.get('displayName', 'Admin'),
+                    'planId': plan_id,
+                    'durationDays': duration_days,
+                    'reason': reason
+                }
+            }
+            mongo.db.subscription_transactions.insert_one(transaction)
+
+            return jsonify({
+                'success': True,
+                'message': f'Subscription granted successfully for {duration_days} days'
+            })
+
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid data format',
+                'errors': {'general': [str(e)]}
+            }), 400
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to create user subscription',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @admin_bp.route('/users/<user_id>/subscription', methods=['PUT'])
+    @token_required
+    @admin_required
+    def update_user_subscription(current_user, user_id):
+        """Update user subscription (admin only)"""
+        try:
+            data = request.get_json()
+            
+            # Find user
+            user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+            if not user:
+                return jsonify({
+                    'success': False,
+                    'message': 'User not found'
+                }), 404
+
+            # Find subscription
+            subscription = mongo.db.subscriptions.find_one({'userId': ObjectId(user_id)})
+            if not subscription:
+                return jsonify({
+                    'success': False,
+                    'message': 'User has no subscription to update'
+                }), 404
+
+            # Prepare update data
+            update_data = {}
+            
+            if 'autoRenew' in data:
+                update_data['autoRenew'] = data['autoRenew']
+            
+            if 'extendDays' in data:
+                extend_days = int(data['extendDays'])
+                current_end_date = subscription.get('endDate', datetime.utcnow())
+                new_end_date = current_end_date + timedelta(days=extend_days)
+                update_data['endDate'] = new_end_date
+            
+            if 'status' in data:
+                status = data['status']
+                if status in ['active', 'cancelled', 'suspended']:
+                    update_data['status'] = status
+                    update_data['isActive'] = status == 'active'
+
+            if update_data:
+                update_data['updatedAt'] = datetime.utcnow()
+                update_data['updatedBy'] = current_user['_id']
+                
+                mongo.db.subscriptions.update_one(
+                    {'userId': ObjectId(user_id)},
+                    {'$set': update_data}
+                )
+
+                # Log the update
+                if 'extendDays' in data:
+                    transaction = {
+                        '_id': ObjectId(),
+                        'userId': ObjectId(user_id),
+                        'subscriptionId': subscription['_id'],
+                        'type': 'subscription_extension',
+                        'amount': 0.0,
+                        'description': f'Admin subscription extension: {data["extendDays"]} days',
+                        'status': 'completed',
+                        'processedBy': current_user['_id'],
+                        'createdAt': datetime.utcnow(),
+                        'metadata': {
+                            'extendedBy': current_user.get('displayName', 'Admin'),
+                            'extensionDays': data['extendDays'],
+                            'reason': data.get('reason', 'Admin extension')
+                        }
+                    }
+                    mongo.db.subscription_transactions.insert_one(transaction)
+
+            return jsonify({
+                'success': True,
+                'message': 'Subscription updated successfully'
+            })
+
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid data format',
+                'errors': {'general': [str(e)]}
+            }), 400
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to update user subscription',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @admin_bp.route('/users/<user_id>/subscription', methods=['DELETE'])
+    @token_required
+    @admin_required
+    def cancel_user_subscription(current_user, user_id):
+        """Cancel user subscription (admin only)"""
+        try:
+            data = request.get_json() or {}
+            reason = data.get('reason', 'Cancelled by admin')
+            
+            # Find user
+            user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+            if not user:
+                return jsonify({
+                    'success': False,
+                    'message': 'User not found'
+                }), 404
+
+            # Find subscription
+            subscription = mongo.db.subscriptions.find_one({'userId': ObjectId(user_id)})
+            if not subscription:
+                return jsonify({
+                    'success': False,
+                    'message': 'User has no active subscription'
+                }), 404
+
+            # Cancel subscription
+            mongo.db.subscriptions.update_one(
+                {'userId': ObjectId(user_id)},
+                {'$set': {
+                    'status': 'cancelled',
+                    'isActive': False,
+                    'autoRenew': False,
+                    'cancelledAt': datetime.utcnow(),
+                    'cancelledBy': current_user['_id'],
+                    'cancellationReason': reason,
+                    'updatedAt': datetime.utcnow()
+                }}
+            )
+
+            # Create cancellation transaction record
+            transaction = {
+                '_id': ObjectId(),
+                'userId': ObjectId(user_id),
+                'subscriptionId': subscription['_id'],
+                'type': 'subscription_cancellation',
+                'amount': 0.0,
+                'description': f'Admin subscription cancellation - {reason}',
+                'status': 'completed',
+                'processedBy': current_user['_id'],
+                'createdAt': datetime.utcnow(),
+                'metadata': {
+                    'cancelledBy': current_user.get('displayName', 'Admin'),
+                    'reason': reason
+                }
+            }
+            mongo.db.subscription_transactions.insert_one(transaction)
+
+            return jsonify({
+                'success': True,
+                'message': 'Subscription cancelled successfully'
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to cancel user subscription',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @admin_bp.route('/subscriptions', methods=['GET'])
+    @token_required
+    @admin_required
+    def get_all_subscriptions(current_user):
+        """Get all user subscriptions for admin management"""
+        try:
+            # Get pagination parameters
+            page = int(request.args.get('page', 1))
+            limit = int(request.args.get('limit', 20))
+            status = request.args.get('status', 'all')  # all, active, expired, cancelled
+            plan_id = request.args.get('planId', '')
+            
+            # Build query
+            query = {}
+            if status != 'all':
+                if status == 'active':
+                    query['isActive'] = True
+                    query['endDate'] = {'$gte': datetime.utcnow()}
+                elif status == 'expired':
+                    query['endDate'] = {'$lt': datetime.utcnow()}
+                elif status == 'cancelled':
+                    query['status'] = 'cancelled'
+            
+            if plan_id:
+                query['planId'] = plan_id
+
+            # Get total count
+            total = mongo.db.subscriptions.count_documents(query)
+            
+            # Get subscriptions with pagination
+            skip = (page - 1) * limit
+            subscriptions = list(mongo.db.subscriptions.find(query)
+                               .sort('createdAt', -1)
+                               .skip(skip)
+                               .limit(limit))
+            
+            # Get user details for each subscription
+            subscription_data = []
+            for sub in subscriptions:
+                sub_data = serialize_doc(sub.copy())
+                
+                # Get user info
+                user = mongo.db.users.find_one({'_id': sub['userId']})
+                if user:
+                    sub_data['user'] = {
+                        'id': str(user['_id']),
+                        'email': user.get('email', ''),
+                        'displayName': user.get('displayName', ''),
+                        'name': user.get('displayName', '')
+                    }
+                
+                # Calculate days remaining
+                days_remaining = None
+                if sub.get('endDate'):
+                    days_remaining = max(0, (sub['endDate'] - datetime.utcnow()).days)
+                sub_data['daysRemaining'] = days_remaining
+                
+                # Format dates
+                if sub_data.get('startDate'):
+                    sub_data['startDate'] = sub['startDate'].isoformat() + 'Z'
+                if sub_data.get('endDate'):
+                    sub_data['endDate'] = sub['endDate'].isoformat() + 'Z'
+                if sub_data.get('createdAt'):
+                    sub_data['createdAt'] = sub['createdAt'].isoformat() + 'Z'
+                if sub_data.get('updatedAt'):
+                    sub_data['updatedAt'] = sub['updatedAt'].isoformat() + 'Z'
+                
+                subscription_data.append(sub_data)
+
+            # Get summary statistics
+            stats = {
+                'total': total,
+                'active': mongo.db.subscriptions.count_documents({
+                    'isActive': True,
+                    'endDate': {'$gte': datetime.utcnow()}
+                }),
+                'expired': mongo.db.subscriptions.count_documents({
+                    'endDate': {'$lt': datetime.utcnow()}
+                }),
+                'cancelled': mongo.db.subscriptions.count_documents({'status': 'cancelled'})
+            }
+
+            return jsonify({
+                'success': True,
+                'data': {
+                    'subscriptions': subscription_data,
+                    'pagination': {
+                        'page': page,
+                        'limit': limit,
+                        'total': total,
+                        'pages': (total + limit - 1) // limit,
+                        'hasNext': page * limit < total,
+                        'hasPrev': page > 1
+                    },
+                    'statistics': stats
+                },
+                'message': 'Subscriptions retrieved successfully'
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve subscriptions',
+                'errors': {'general': [str(e)]}
+            }), 500
+         
+    
+return admin_bp
