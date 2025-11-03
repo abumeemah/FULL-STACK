@@ -752,7 +752,7 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
                 'success': False,
                 'message': 'Failed to retrieve income statistics',
                 'errors': {'general': [str(e)]}
-            }), 500n date range
+            }), 500
             incomes = list(mongo.db.incomes.find({
                 'userId': current_user['_id'],
                 'dateReceived': {
@@ -913,4 +913,5 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
             }), 500
 
     return income_bp
+
 
