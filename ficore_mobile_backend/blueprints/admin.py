@@ -858,6 +858,90 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                 'errors': {'general': [str(e)]}
             }), 500
 
+    @admin_bp.route('/users/<user_id>/status', methods=['PUT'])
+    @token_required
+    @admin_required
+    def update_user_status(current_user, user_id):
+        """Update user status (activate/suspend) - unified endpoint for frontend compatibility"""
+        try:
+            data = request.get_json()
+            
+            if 'is_active' not in data:
+                return jsonify({
+                    'success': False,
+                    'message': 'is_active field is required'
+                }), 400
+
+            is_active = data['is_active']
+            reason = data.get('suspension_reason', 'Status updated by admin')
+            
+            # Find user
+            user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+            if not user:
+                return jsonify({
+                    'success': False,
+                    'message': 'User not found'
+                }), 404
+
+            # Update user status
+            update_data = {
+                'isActive': is_active,
+                'updatedAt': datetime.utcnow()
+            }
+            
+            if is_active:
+                # Activating user
+                update_data.update({
+                    'activatedAt': datetime.utcnow(),
+                    'activatedBy': current_user['_id']
+                })
+                # Remove suspension fields
+                mongo.db.users.update_one(
+                    {'_id': ObjectId(user_id)},
+                    {
+                        '$set': update_data,
+                        '$unset': {
+                            'suspendedAt': '',
+                            'suspendedBy': '',
+                            'suspensionReason': ''
+                        }
+                    }
+                )
+            else:
+                # Suspending user
+                update_data.update({
+                    'suspendedAt': datetime.utcnow(),
+                    'suspendedBy': current_user['_id'],
+                    'suspensionReason': reason
+                })
+                mongo.db.users.update_one(
+                    {'_id': ObjectId(user_id)},
+                    {'$set': update_data}
+                )
+
+            # Get updated user
+            updated_user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+            user_response = serialize_doc(updated_user.copy())
+            del user_response['password']
+            user_response['createdAt'] = updated_user.get('createdAt', datetime.utcnow()).isoformat() + 'Z'
+            if updated_user.get('lastLogin'):
+                user_response['lastLogin'] = updated_user['lastLogin'].isoformat() + 'Z'
+            # Ensure `name` is present (mirror displayName)
+            user_response['name'] = user_response.get('displayName', '')
+
+            return jsonify({
+                'success': True,
+                'data': user_response,
+                'message': f'User {"activated" if is_active else "suspended"} successfully'
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to update user status',
+                'errors': {'general': [str(e)]}
+            }), 500
+
     @admin_bp.route('/users/<user_id>', methods=['DELETE'])
     @token_required
     @admin_required
@@ -1986,4 +2070,3 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
             }), 500
          
     return admin_bp
-
