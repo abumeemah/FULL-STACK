@@ -147,6 +147,7 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
             page = int(request.args.get('page', 1))
             limit = int(request.args.get('limit', 20))
             search = request.args.get('search', '')
+            email = request.args.get('email', '')  # Add email-specific search
             role = request.args.get('role', '')
             is_active = request.args.get('is_active', '')
             sort_by = request.args.get('sort_by', 'createdAt')
@@ -154,7 +155,12 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
             
             # Build query
             query = {}
-            if search:
+            
+            # Handle email-specific search (exact match or partial)
+            if email:
+                query['email'] = {'$regex': email, '$options': 'i'}
+            elif search:
+                # General search across multiple fields
                 query['$or'] = [
                     {'email': {'$regex': search, '$options': 'i'}},
                     {'displayName': {'$regex': search, '$options': 'i'}},
@@ -601,6 +607,61 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
             return jsonify({
                 'success': False,
                 'message': 'Failed to update user credits',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @admin_bp.route('/users/<user_id>', methods=['GET'])
+    @token_required
+    @admin_required
+    def get_user_by_id(current_user, user_id):
+        """Get specific user details by ID (admin only)"""
+        try:
+            # Find user
+            user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+            if not user:
+                return jsonify({
+                    'success': False,
+                    'message': 'User not found'
+                }), 404
+
+            # Serialize user data (exclude sensitive data)
+            user_info = {
+                'id': str(user['_id']),
+                '_id': str(user['_id']),  # For backward compatibility
+                'email': user.get('email', ''),
+                'firstName': user.get('firstName', ''),
+                'lastName': user.get('lastName', ''),
+                'displayName': user.get('displayName', ''),
+                'name': user.get('displayName', ''),
+                'phone': user.get('phone', ''),
+                'address': user.get('address', ''),
+                'dateOfBirth': user.get('dateOfBirth', ''),
+                'role': user.get('role', 'personal'),
+                'ficoreCreditBalance': user.get('ficoreCreditBalance', 0.0),
+                'language': user.get('language', 'en'),
+                'setupComplete': user.get('setupComplete', False),
+                'isActive': user.get('isActive', True),
+                'createdAt': user.get('createdAt', datetime.utcnow()).isoformat() + 'Z',
+                'lastLogin': user.get('lastLogin').isoformat() + 'Z' if user.get('lastLogin') else None,
+                'financialGoals': user.get('financialGoals', []),
+                # Subscription info
+                'isSubscribed': user.get('isSubscribed', False),
+                'subscriptionType': user.get('subscriptionType'),
+                'subscriptionStartDate': user.get('subscriptionStartDate').isoformat() + 'Z' if user.get('subscriptionStartDate') else None,
+                'subscriptionEndDate': user.get('subscriptionEndDate').isoformat() + 'Z' if user.get('subscriptionEndDate') else None,
+                'subscriptionAutoRenew': user.get('subscriptionAutoRenew', False)
+            }
+
+            return jsonify({
+                'success': True,
+                'data': user_info,
+                'message': 'User retrieved successfully'
+            })
+
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve user',
                 'errors': {'general': [str(e)]}
             }), 500
 
