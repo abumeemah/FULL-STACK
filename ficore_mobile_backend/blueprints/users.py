@@ -38,7 +38,13 @@ def get_profile():
                 'setupComplete': current_user.get('setupComplete', False),
                 'financialGoals': current_user.get('financialGoals', []),
                 'createdAt': current_user.get('createdAt', datetime.utcnow()).isoformat() + 'Z',
-                'lastLogin': current_user.get('lastLogin', datetime.utcnow()).isoformat() + 'Z' if current_user.get('lastLogin') else None
+                'lastLogin': current_user.get('lastLogin', datetime.utcnow()).isoformat() + 'Z' if current_user.get('lastLogin') else None,
+                # Add subscription information to profile
+                'isSubscribed': current_user.get('isSubscribed', False),
+                'subscriptionType': current_user.get('subscriptionType'),
+                'subscriptionStartDate': current_user.get('subscriptionStartDate').isoformat() + 'Z' if current_user.get('subscriptionStartDate') else None,
+                'subscriptionEndDate': current_user.get('subscriptionEndDate').isoformat() + 'Z' if current_user.get('subscriptionEndDate') else None,
+                'subscriptionAutoRenew': current_user.get('subscriptionAutoRenew', False)
             }
             
             return jsonify({
