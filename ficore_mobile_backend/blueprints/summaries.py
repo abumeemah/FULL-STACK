@@ -297,10 +297,10 @@ def init_summaries_blueprint(mongo, token_required, serialize_doc):
             except Exception as e:
                 print(f"Error fetching incomes: {e}")
             
-            # Get ALL expense data with proper aggregation
+            # CRITICAL FIX: Get ALL expense data with optimized single aggregation pipeline
             try:
-                # Total expenses (all time)
-                total_expense_pipeline = [
+                # OPTIMIZED: Single aggregation pipeline for all expense calculations
+                expense_aggregation_pipeline = [
                     {
                         '$match': {
                             'userId': current_user['_id']
@@ -309,63 +309,68 @@ def init_summaries_blueprint(mongo, token_required, serialize_doc):
                     {
                         '$group': {
                             '_id': None,
-                            'total': {'$sum': '$amount'}
-                        }
-                    }
-                ]
-                total_expense_result = list(mongo.db.expenses.aggregate(total_expense_pipeline))
-                summary_data['totalExpenses'] = float(total_expense_result[0]['total']) if total_expense_result else 0.0
-                
-                # Monthly expenses
-                monthly_expense_pipeline = [
-                    {
-                        '$match': {
-                            'userId': current_user['_id'],
-                            'date': {
-                                '$gte': start_of_month,
-                                '$lte': now
+                            'totalExpenses': {'$sum': '$amount'},
+                            'monthlyExpenses': {
+                                '$sum': {
+                                    '$cond': [
+                                        {
+                                            '$and': [
+                                                {'$gte': ['$date', start_of_month]},
+                                                {'$lte': ['$date', now]}
+                                            ]
+                                        },
+                                        '$amount',
+                                        0
+                                    ]
+                                }
+                            },
+                            'yearlyExpenses': {
+                                '$sum': {
+                                    '$cond': [
+                                        {
+                                            '$and': [
+                                                {'$gte': ['$date', start_of_year]},
+                                                {'$lte': ['$date', now]}
+                                            ]
+                                        },
+                                        '$amount',
+                                        0
+                                    ]
+                                }
                             }
                         }
-                    },
-                    {
-                        '$group': {
-                            '_id': None,
-                            'total': {'$sum': '$amount'}
-                        }
                     }
                 ]
-                monthly_expense_result = list(mongo.db.expenses.aggregate(monthly_expense_pipeline))
-                monthly_expenses = float(monthly_expense_result[0]['total']) if monthly_expense_result else 0.0
-                summary_data['monthlyExpenses'] = monthly_expenses
-                summary_data['monthlyStats']['expenses'] = monthly_expenses
                 
-                # Yearly expenses
-                yearly_expense_pipeline = [
-                    {
-                        '$match': {
-                            'userId': current_user['_id'],
-                            'date': {
-                                '$gte': start_of_year,
-                                '$lte': now
-                            }
-                        }
-                    },
-                    {
-                        '$group': {
-                            '_id': None,
-                            'total': {'$sum': '$amount'}
-                        }
-                    }
-                ]
-                yearly_expense_result = list(mongo.db.expenses.aggregate(yearly_expense_pipeline))
-                yearly_expenses = float(yearly_expense_result[0]['total']) if yearly_expense_result else 0.0
-                summary_data['yearlyExpenses'] = yearly_expenses
-                summary_data['yearlyStats']['expenses'] = yearly_expenses
+                expense_result = list(mongo.db.expenses.aggregate(expense_aggregation_pipeline))
                 
-                print(f"DEBUG ENHANCED SUMMARY - Total Expenses: {summary_data['totalExpenses']}, Monthly: {monthly_expenses}, Yearly: {yearly_expenses}")
+                if expense_result:
+                    result = expense_result[0]
+                    summary_data['totalExpenses'] = float(result.get('totalExpenses', 0))
+                    monthly_expenses = float(result.get('monthlyExpenses', 0))
+                    yearly_expenses = float(result.get('yearlyExpenses', 0))
+                    
+                    summary_data['monthlyExpenses'] = monthly_expenses
+                    summary_data['monthlyStats']['expenses'] = monthly_expenses
+                    summary_data['yearlyExpenses'] = yearly_expenses
+                    summary_data['yearlyStats']['expenses'] = yearly_expenses
+                else:
+                    summary_data['totalExpenses'] = 0.0
+                    summary_data['monthlyExpenses'] = 0.0
+                    summary_data['monthlyStats']['expenses'] = 0.0
+                    summary_data['yearlyExpenses'] = 0.0
+                    summary_data['yearlyStats']['expenses'] = 0.0
+                
+                print(f"DEBUG OPTIMIZED SUMMARY - Total Expenses: {summary_data['totalExpenses']}, Monthly: {summary_data['monthlyExpenses']}, Yearly: {summary_data['yearlyExpenses']}")
                 
             except Exception as e:
                 print(f"Error fetching expenses: {e}")
+                # Fallback to zero values on error
+                summary_data['totalExpenses'] = 0.0
+                summary_data['monthlyExpenses'] = 0.0
+                summary_data['monthlyStats']['expenses'] = 0.0
+                summary_data['yearlyExpenses'] = 0.0
+                summary_data['yearlyStats']['expenses'] = 0.0
             
             # Calculate net income
             summary_data['monthlyStats']['netIncome'] = summary_data['monthlyStats']['income'] - summary_data['monthlyStats']['expenses']

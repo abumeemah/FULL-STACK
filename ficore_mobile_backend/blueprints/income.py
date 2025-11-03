@@ -14,36 +14,49 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
     @token_required
     def get_incomes(current_user):
         try:
-            page = int(request.args.get('page', 1))
-            limit = int(request.args.get('limit', 10))
+            # FIXED: Use offset/limit instead of page for consistency with frontend
+            limit = min(int(request.args.get('limit', 50)), 100)
+            offset = max(int(request.args.get('offset', 0)), 0)
             category = request.args.get('category')
             frequency = request.args.get('frequency')
             start_date = request.args.get('start_date')
             end_date = request.args.get('end_date')
+            sort_by = request.args.get('sort_by', 'dateReceived')
+            sort_order = request.args.get('sort_order', 'desc')
             
-            # Build query
-            query = {'userId': current_user['_id']}
+            # Build query - ONLY actual received incomes
+            now = datetime.utcnow()
+            query = {
+                'userId': current_user['_id'],
+                'dateReceived': {'$lte': now}  # Only past and present incomes
+            }
+            
             if category:
                 query['category'] = category
             if frequency:
                 query['frequency'] = frequency
             if start_date or end_date:
-                date_query = {}
+                date_query = query.get('dateReceived', {})
                 if start_date:
                     date_query['$gte'] = datetime.fromisoformat(start_date.replace('Z', ''))
                 if end_date:
-                    date_query['$lte'] = datetime.fromisoformat(end_date.replace('Z', ''))
+                    date_query['$lte'] = min(datetime.fromisoformat(end_date.replace('Z', '')), now)
                 query['dateReceived'] = date_query
             
+            # FIXED: Proper sorting
+            sort_direction = -1 if sort_order == 'desc' else 1
+            sort_field = sort_by if sort_by in ['dateReceived', 'amount', 'source', 'createdAt'] else 'dateReceived'
+            
             # Get incomes with pagination
-            skip = (page - 1) * limit
-            incomes = list(mongo.db.incomes.find(query).sort('dateReceived', -1).skip(skip).limit(limit))
+            incomes = list(mongo.db.incomes.find(query).sort(sort_field, sort_direction).skip(offset).limit(limit))
             total = mongo.db.incomes.count_documents(query)
             
-            # Serialize incomes
+            # Serialize incomes with proper field mapping
             income_list = []
             for income in incomes:
                 income_data = serialize_doc(income.copy())
+                # FIXED: Map source to title for frontend compatibility
+                income_data['title'] = income_data.get('source', income_data.get('title', 'Income'))
                 income_data['dateReceived'] = income_data.get('dateReceived', datetime.utcnow()).isoformat() + 'Z'
                 income_data['createdAt'] = income_data.get('createdAt', datetime.utcnow()).isoformat() + 'Z'
                 income_data['updatedAt'] = income_data.get('updatedAt', datetime.utcnow()).isoformat() + 'Z' if income_data.get('updatedAt') else None
@@ -51,14 +64,19 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
                 income_data['nextRecurringDate'] = None
                 income_list.append(income_data)
             
+            # FIXED: Pagination format expected by frontend
+            has_more = offset + limit < total
+            
             return jsonify({
                 'success': True,
                 'data': {
                     'incomes': income_list,
                     'pagination': {
-                        'page': page,
-                        'limit': limit,
                         'total': total,
+                        'limit': limit,
+                        'offset': offset,
+                        'hasMore': has_more,
+                        'page': (offset // limit) + 1,
                         'pages': (total + limit - 1) // limit
                     }
                 },
@@ -66,6 +84,7 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
             })
             
         except Exception as e:
+            print(f"Error in get_incomes: {e}")
             return jsonify({
                 'success': False,
                 'message': 'Failed to retrieve income records',
@@ -170,16 +189,18 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
             # NOTE: Credit deduction is handled by frontend executeWithCredits()
             # to avoid double deduction
             
+            # FIXED: Return full income data like other endpoints
+            created_income = serialize_doc(income_data.copy())
+            created_income['id'] = income_id
+            created_income['title'] = created_income.get('source', 'Income')  # Map for frontend
+            created_income['dateReceived'] = created_income.get('dateReceived', datetime.utcnow()).isoformat() + 'Z'
+            created_income['createdAt'] = created_income.get('createdAt', datetime.utcnow()).isoformat() + 'Z'
+            created_income['updatedAt'] = created_income.get('updatedAt', datetime.utcnow()).isoformat() + 'Z'
+            created_income['nextRecurringDate'] = None
+            
             return jsonify({
                 'success': True,
-                'data': {
-                    'id': income_id,
-                    'amount': income_data['amount'],
-                    'source': income_data['source'],
-                    'salesType': income_data.get('salesType'),
-                    'category': income_data['category'],
-                    'frequency': income_data['frequency']
-                },
+                'data': created_income,
                 'message': 'Income record created successfully'
             })
             
@@ -622,25 +643,116 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
     @income_bp.route('/statistics', methods=['GET'])
     @token_required
     def get_income_statistics(current_user):
-        """Get comprehensive income statistics for frontend data sourcing"""
+        """Get comprehensive income statistics in format expected by frontend"""
         try:
             # Get date range parameters
             start_date_str = request.args.get('start_date')
             end_date_str = request.args.get('end_date')
             
-            # Default to current year if no dates provided
+            # Default to current month if no dates provided
             now = datetime.utcnow()
             if start_date_str:
                 start_date = datetime.fromisoformat(start_date_str.replace('Z', ''))
             else:
-                start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+                start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             
             if end_date_str:
                 end_date = datetime.fromisoformat(end_date_str.replace('Z', ''))
             else:
                 end_date = now
             
-            # Get all income data for the user within date range
+            # Get income data - ONLY actual received incomes within date range
+            query = {
+                'userId': current_user['_id'],
+                'dateReceived': {
+                    '$gte': start_date,
+                    '$lte': end_date
+                }
+            }
+            incomes = list(mongo.db.incomes.find(query))
+            
+            if not incomes:
+                # Return empty statistics structure
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'statistics': {
+                            'totals': {
+                                'count': 0,
+                                'totalAmount': 0,
+                                'averageAmount': 0,
+                                'maxAmount': 0,
+                                'minAmount': 0
+                            },
+                            'breakdown': {
+                                'bySource': {},
+                                'byMonth': {}
+                            },
+                            'insights': {
+                                'topSource': 'None',
+                                'topSourceAmount': 0,
+                                'sourcesCount': 0
+                            }
+                        }
+                    },
+                    'message': 'Income statistics retrieved successfully'
+                })
+            
+            # Calculate statistics in the format expected by frontend
+            amounts = [inc.get('amount', 0) for inc in incomes]
+            total_amount = sum(amounts)
+            avg_amount = total_amount / len(amounts) if amounts else 0
+            max_amount = max(amounts) if amounts else 0
+            min_amount = min(amounts) if amounts else 0
+            
+            # Source breakdown
+            sources = {}
+            for income in incomes:
+                source = income.get('source', 'Unknown')
+                sources[source] = sources.get(source, 0) + income.get('amount', 0)
+            
+            # Monthly breakdown
+            monthly = {}
+            for income in incomes:
+                date = income.get('dateReceived', datetime.utcnow())
+                month_key = date.strftime('%Y-%m')
+                monthly[month_key] = monthly.get(month_key, 0) + income.get('amount', 0)
+            
+            # FIXED: Return statistics in the format expected by IncomeStatistics.fromJson()
+            statistics_data = {
+                'totals': {
+                    'count': len(incomes),
+                    'totalAmount': total_amount,
+                    'averageAmount': avg_amount,
+                    'maxAmount': max_amount,
+                    'minAmount': min_amount
+                },
+                'breakdown': {
+                    'bySource': sources,
+                    'byMonth': monthly
+                },
+                'insights': {
+                    'topSource': max(sources.items(), key=lambda x: x[1])[0] if sources else 'None',
+                    'topSourceAmount': max(sources.values()) if sources else 0,
+                    'sourcesCount': len(sources)
+                }
+            }
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'statistics': statistics_data
+                },
+                'message': 'Income statistics retrieved successfully'
+            })
+            
+        except Exception as e:
+            print(f"Error in get_income_statistics: {e}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve income statistics',
+                'errors': {'general': [str(e)]}
+            }), 500n date range
             incomes = list(mongo.db.incomes.find({
                 'userId': current_user['_id'],
                 'dateReceived': {
@@ -738,6 +850,65 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
             return jsonify({
                 'success': False,
                 'message': 'Failed to retrieve income statistics',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @income_bp.route('/sources', methods=['GET'])
+    @token_required
+    def get_income_sources(current_user):
+        try:
+            # Get query parameters for date filtering
+            start_date = request.args.get('start_date')
+            end_date = request.args.get('end_date')
+            
+            # Build query - ONLY actual received incomes
+            now = datetime.utcnow()
+            query = {
+                'userId': current_user['_id'],
+                'dateReceived': {'$lte': now}  # Only past and present incomes
+            }
+            
+            if start_date or end_date:
+                date_query = query.get('dateReceived', {})
+                if start_date:
+                    date_query['$gte'] = datetime.fromisoformat(start_date.replace('Z', ''))
+                if end_date:
+                    date_query['$lte'] = min(datetime.fromisoformat(end_date.replace('Z', '')), now)
+                query['dateReceived'] = date_query
+            
+            # Get incomes and calculate source totals
+            incomes = list(mongo.db.incomes.find(query))
+            source_totals = {}
+            sources = set()
+            
+            for income in incomes:
+                source = income.get('source', 'Unknown')
+                sources.add(source)
+                source_totals[source] = source_totals.get(source, 0) + income.get('amount', 0)
+            
+            # Default sources if none exist
+            if not sources:
+                default_sources = {
+                    'Salary', 'Business Revenue', 'Freelance', 'Investment Returns',
+                    'Rental Income', 'Commission', 'Bonus', 'Gift', 'Refund',
+                    'Side Hustle', 'Consulting', 'Royalties', 'Other'
+                }
+                sources = default_sources
+                # Set all default sources to 0
+                for source in default_sources:
+                    source_totals[source] = 0.0
+            
+            return jsonify({
+                'success': True,
+                'data': source_totals,  # Return totals instead of just sources
+                'message': 'Income sources retrieved successfully'
+            })
+            
+        except Exception as e:
+            print(f"Error in get_income_sources: {e}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve income sources',
                 'errors': {'general': [str(e)]}
             }), 500
 

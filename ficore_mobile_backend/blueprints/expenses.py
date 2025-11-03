@@ -17,11 +17,14 @@ def get_expenses():
     @expenses_bp.token_required
     def _get_expenses(current_user):
         try:
-            page = int(request.args.get('page', 1))
-            limit = int(request.args.get('limit', 10))
+            # FIXED: Use offset/limit instead of page for consistency with frontend
+            limit = min(int(request.args.get('limit', 50)), 100)
+            offset = max(int(request.args.get('offset', 0)), 0)
             category = request.args.get('category')
             start_date = request.args.get('start_date')
             end_date = request.args.get('end_date')
+            sort_by = request.args.get('sort_by', 'date')
+            sort_order = request.args.get('sort_order', 'desc')
             
             # Build query
             query = {'userId': current_user['_id']}
@@ -35,28 +38,38 @@ def get_expenses():
                     date_query['$lte'] = datetime.fromisoformat(end_date.replace('Z', ''))
                 query['date'] = date_query
             
+            # FIXED: Proper sorting
+            sort_direction = -1 if sort_order == 'desc' else 1
+            sort_field = sort_by if sort_by in ['date', 'amount', 'category', 'createdAt'] else 'date'
+            
             # Get expenses with pagination
-            skip = (page - 1) * limit
-            expenses = list(expenses_bp.mongo.db.expenses.find(query).sort('date', -1).skip(skip).limit(limit))
+            expenses = list(expenses_bp.mongo.db.expenses.find(query).sort(sort_field, sort_direction).skip(offset).limit(limit))
             total = expenses_bp.mongo.db.expenses.count_documents(query)
             
-            # Serialize expenses
+            # Serialize expenses with proper field mapping
             expense_list = []
             for expense in expenses:
                 expense_data = expenses_bp.serialize_doc(expense.copy())
+                # FIXED: Map description to title for frontend compatibility
+                expense_data['title'] = expense_data.get('description', expense_data.get('title', 'Expense'))
                 expense_data['date'] = expense_data.get('date', datetime.utcnow()).isoformat() + 'Z'
                 expense_data['createdAt'] = expense_data.get('createdAt', datetime.utcnow()).isoformat() + 'Z'
                 expense_data['updatedAt'] = expense_data.get('updatedAt', datetime.utcnow()).isoformat() + 'Z' if expense_data.get('updatedAt') else None
                 expense_list.append(expense_data)
+            
+            # FIXED: Pagination format expected by frontend
+            has_more = offset + limit < total
             
             return jsonify({
                 'success': True,
                 'data': {
                     'expenses': expense_list,
                     'pagination': {
-                        'page': page,
-                        'limit': limit,
                         'total': total,
+                        'limit': limit,
+                        'offset': offset,
+                        'hasMore': has_more,
+                        'page': (offset // limit) + 1,
                         'pages': (total + limit - 1) // limit
                     }
                 },
@@ -64,6 +77,7 @@ def get_expenses():
             })
             
         except Exception as e:
+            print(f"Error in get_expenses: {e}")
             return jsonify({
                 'success': False,
                 'message': 'Failed to retrieve expenses',
@@ -162,17 +176,17 @@ def create_expense():
             result = expenses_bp.mongo.db.expenses.insert_one(expense_data)
             expense_id = str(result.inserted_id)
             
-            # NOTE: Credit deduction is handled by frontend executeWithCredits()
-            # to avoid double deduction
+            # FIXED: Return full expense data like other endpoints
+            created_expense = expenses_bp.serialize_doc(expense_data.copy())
+            created_expense['id'] = expense_id
+            created_expense['title'] = created_expense.get('description', 'Expense')  # Map for frontend
+            created_expense['date'] = created_expense.get('date', datetime.utcnow()).isoformat() + 'Z'
+            created_expense['createdAt'] = created_expense.get('createdAt', datetime.utcnow()).isoformat() + 'Z'
+            created_expense['updatedAt'] = created_expense.get('updatedAt', datetime.utcnow()).isoformat() + 'Z'
             
             return jsonify({
                 'success': True,
-                'data': {
-                    'id': expense_id,
-                    'amount': expense_data['amount'],
-                    'description': expense_data['description'],
-                    'category': expense_data['category']
-                },
+                'data': created_expense,
                 'message': 'Expense created successfully'
             })
             
@@ -290,40 +304,62 @@ def get_expense_summary():
     @expenses_bp.token_required
     def _get_expense_summary(current_user):
         try:
+            # Get query parameters for date filtering
+            start_date = request.args.get('start_date')
+            end_date = request.args.get('end_date')
+            
             # Get date ranges
             now = datetime.utcnow()
             start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             start_of_last_month = (start_of_month - timedelta(days=1)).replace(day=1)
             
-            # Get expense data
-            expenses = list(expenses_bp.mongo.db.expenses.find({'userId': current_user['_id']}))
+            # Use provided dates or default to current month
+            if start_date:
+                filter_start = datetime.fromisoformat(start_date.replace('Z', ''))
+            else:
+                filter_start = start_of_month
+                
+            if end_date:
+                filter_end = datetime.fromisoformat(end_date.replace('Z', ''))
+            else:
+                filter_end = now
+            
+            # Get all expense data for calculations
+            all_expenses = list(expenses_bp.mongo.db.expenses.find({'userId': current_user['_id']}))
+            
+            # Filter expenses for the requested period
+            filtered_expenses = [exp for exp in all_expenses if filter_start <= exp['date'] <= filter_end]
             
             # Calculate totals
-            total_this_month = sum(exp['amount'] for exp in expenses if exp['date'] >= start_of_month)
-            total_last_month = sum(exp['amount'] for exp in expenses if start_of_last_month <= exp['date'] < start_of_month)
+            total_this_month = sum(exp['amount'] for exp in all_expenses if exp['date'] >= start_of_month)
+            total_last_month = sum(exp['amount'] for exp in all_expenses if start_of_last_month <= exp['date'] < start_of_month)
             
-            # Category breakdown
+            # Category breakdown for current period
             category_totals = {}
-            for expense in expenses:
-                if expense['date'] >= start_of_month:
-                    category = expense['category']
-                    category_totals[category] = category_totals.get(category, 0) + expense['amount']
+            for expense in filtered_expenses:
+                category = expense.get('category', 'Uncategorized')
+                category_totals[category] = category_totals.get(category, 0) + expense['amount']
             
-            # Recent expenses
-            recent_expenses = sorted(expenses, key=lambda x: x['date'], reverse=True)[:5]
+            # Recent expenses (from all expenses, not just filtered)
+            recent_expenses = sorted(all_expenses, key=lambda x: x['date'], reverse=True)[:5]
             recent_expenses_data = []
             for expense in recent_expenses:
                 expense_data = expenses_bp.serialize_doc(expense.copy())
+                # FIXED: Map description to title for frontend compatibility
+                expense_data['title'] = expense_data.get('description', expense_data.get('title', 'Expense'))
                 expense_data['date'] = expense_data.get('date', datetime.utcnow()).isoformat() + 'Z'
+                expense_data['createdAt'] = expense_data.get('createdAt', datetime.utcnow()).isoformat() + 'Z'
+                expense_data['updatedAt'] = expense_data.get('updatedAt', datetime.utcnow()).isoformat() + 'Z'
                 recent_expenses_data.append(expense_data)
             
+            # FIXED: Return summary in the format expected by ExpenseSummary.fromJson()
             summary_data = {
                 'totalThisMonth': total_this_month,
                 'totalLastMonth': total_last_month,
                 'categoryBreakdown': category_totals,
                 'recentExpenses': recent_expenses_data,
-                'totalExpenses': len(expenses),
-                'averageExpense': sum(exp['amount'] for exp in expenses) / len(expenses) if expenses else 0
+                'totalExpenses': len(filtered_expenses),
+                'averageExpense': sum(exp['amount'] for exp in filtered_expenses) / len(filtered_expenses) if filtered_expenses else 0
             }
             
             return jsonify({
@@ -333,6 +369,7 @@ def get_expense_summary():
             })
             
         except Exception as e:
+            print(f"Error in get_expense_summary: {e}")
             return jsonify({
                 'success': False,
                 'message': 'Failed to retrieve expense summary',
@@ -346,14 +383,33 @@ def get_expense_categories():
     @expenses_bp.token_required
     def _get_expense_categories(current_user):
         try:
-            # Get unique categories from user's expenses
-            expenses = list(expenses_bp.mongo.db.expenses.find({'userId': current_user['_id']}))
-            categories = set(expense.get('category', '') for expense in expenses)
+            # Get query parameters for date filtering
+            start_date = request.args.get('start_date')
+            end_date = request.args.get('end_date')
+            
+            # Build query
+            query = {'userId': current_user['_id']}
+            if start_date or end_date:
+                date_query = {}
+                if start_date:
+                    date_query['$gte'] = datetime.fromisoformat(start_date.replace('Z', ''))
+                if end_date:
+                    date_query['$lte'] = datetime.fromisoformat(end_date.replace('Z', ''))
+                query['date'] = date_query
+            
+            # Get expenses and calculate category totals
+            expenses = list(expenses_bp.mongo.db.expenses.find(query))
+            category_totals = {}
+            categories = set()
+            
+            for expense in expenses:
+                category = expense.get('category', 'Uncategorized')
+                categories.add(category)
+                category_totals[category] = category_totals.get(category, 0) + expense.get('amount', 0)
             
             # Default categories if none exist
             if not categories:
-                # Default categories - extended with business-focused categories for tax tracking
-                categories = {
+                default_categories = {
                     'Food & Dining', 'Transportation', 'Shopping', 'Entertainment',
                     'Bills & Utilities', 'Healthcare', 'Education', 'Travel',
                     'Personal Care', 'Home & Garden', 'Gifts & Donations',
@@ -363,14 +419,19 @@ def get_expense_categories():
                     'Statutory & Legal Contributions',
                     'Other'
                 }
+                categories = default_categories
+                # Set all default categories to 0
+                for cat in default_categories:
+                    category_totals[cat] = 0.0
             
             return jsonify({
                 'success': True,
-                'data': {'categories': sorted(list(categories))},
+                'data': category_totals,  # Return totals instead of just categories
                 'message': 'Expense categories retrieved successfully'
             })
             
         except Exception as e:
+            print(f"Error in get_expense_categories: {e}")
             return jsonify({
                 'success': False,
                 'message': 'Failed to retrieve expense categories',
@@ -378,6 +439,96 @@ def get_expense_categories():
             }), 500
     
     return _get_expense_categories()
+
+@expenses_bp.route('/statistics', methods=['GET'])
+def get_expense_statistics():
+    @expenses_bp.token_required
+    def _get_expense_statistics(current_user):
+        """CRITICAL FIX: Dedicated statistics endpoint for monthly expense data"""
+        try:
+            # Get query parameters for date filtering
+            start_date = request.args.get('start_date')
+            end_date = request.args.get('end_date')
+            
+            # Default to current month if no dates provided
+            now = datetime.utcnow()
+            if start_date:
+                filter_start = datetime.fromisoformat(start_date.replace('Z', ''))
+            else:
+                filter_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                
+            if end_date:
+                filter_end = datetime.fromisoformat(end_date.replace('Z', ''))
+            else:
+                filter_end = now
+            
+            # CRITICAL FIX: Use MongoDB aggregation for accurate statistics
+            statistics_pipeline = [
+                {
+                    '$match': {
+                        'userId': current_user['_id'],
+                        'date': {
+                            '$gte': filter_start,
+                            '$lte': filter_end
+                        }
+                    }
+                },
+                {
+                    '$group': {
+                        '_id': None,
+                        'totalAmount': {'$sum': '$amount'},
+                        'totalCount': {'$sum': 1},
+                        'averageAmount': {'$avg': '$amount'},
+                        'maxAmount': {'$max': '$amount'},
+                        'minAmount': {'$min': '$amount'}
+                    }
+                }
+            ]
+            
+            statistics_result = list(expenses_bp.mongo.db.expenses.aggregate(statistics_pipeline))
+            
+            if statistics_result:
+                stats = statistics_result[0]
+                statistics_data = {
+                    'totalAmount': float(stats.get('totalAmount', 0)),
+                    'totalCount': int(stats.get('totalCount', 0)),
+                    'averageAmount': float(stats.get('averageAmount', 0)),
+                    'maxAmount': float(stats.get('maxAmount', 0)),
+                    'minAmount': float(stats.get('minAmount', 0)),
+                    'period': {
+                        'startDate': filter_start.isoformat() + 'Z',
+                        'endDate': filter_end.isoformat() + 'Z'
+                    }
+                }
+            else:
+                # No expenses found for the period
+                statistics_data = {
+                    'totalAmount': 0.0,
+                    'totalCount': 0,
+                    'averageAmount': 0.0,
+                    'maxAmount': 0.0,
+                    'minAmount': 0.0,
+                    'period': {
+                        'startDate': filter_start.isoformat() + 'Z',
+                        'endDate': filter_end.isoformat() + 'Z'
+                    }
+                }
+            
+            return jsonify({
+                'success': True,
+                'data': statistics_data,
+                'message': 'Expense statistics retrieved successfully'
+            })
+            
+        except Exception as e:
+            print(f"Error in get_expense_statistics: {e}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve expense statistics',
+                'errors': {'general': [str(e)]}
+            }), 500
+    
+    return _get_expense_statistics()
 
 @expenses_bp.route('/insights', methods=['GET'])
 def get_expense_insights():
@@ -542,16 +693,6 @@ def get_expense_statistics():
             # Get query parameters
             start_date = request.args.get('start_date')
             end_date = request.args.get('end_date')
-            group_by = request.args.get('group_by', 'month')  # Default to month
-            
-            # Validate group_by parameter
-            valid_groups = ['month', 'category', 'payment_method']
-            if group_by not in valid_groups:
-                return jsonify({
-                    'success': False,
-                    'message': 'Invalid group_by parameter',
-                    'errors': {'group_by': [f'Must be one of: {", ".join(valid_groups)}']}
-                }), 400
             
             # Build query
             query = {'userId': current_user['_id']}
@@ -566,52 +707,83 @@ def get_expense_statistics():
             # Get expense data
             expenses = list(expenses_bp.mongo.db.expenses.find(query))
             
-            # Calculate statistics
-            from collections import defaultdict
-            statistics = defaultdict(float)
-            total = 0
-            count = len(expenses)
+            if not expenses:
+                # Return empty statistics structure
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'statistics': {
+                            'totals': {
+                                'count': 0,
+                                'totalAmount': 0,
+                                'averageAmount': 0,
+                                'maxAmount': 0,
+                                'minAmount': 0
+                            },
+                            'breakdown': {
+                                'byCategory': {},
+                                'byMonth': {}
+                            },
+                            'insights': {
+                                'topCategory': 'None',
+                                'topCategoryAmount': 0,
+                                'categoriesCount': 0
+                            }
+                        }
+                    },
+                    'message': 'Expense statistics retrieved successfully'
+                })
             
-            if group_by == 'month':
-                for expense in expenses:
-                    if expense.get('date'):
-                        month_key = expense['date'].strftime('%Y-%m')
-                        statistics[month_key] += expense.get('amount', 0)
-                        total += expense.get('amount', 0)
-            elif group_by == 'category':
-                for expense in expenses:
-                    category = expense.get('category', 'Unknown')
-                    statistics[category] += expense.get('amount', 0)
-                    total += expense.get('amount', 0)
-            elif group_by == 'payment_method':
-                for expense in expenses:
-                    payment_method = expense.get('paymentMethod', 'Unknown')
-                    statistics[payment_method] += expense.get('amount', 0)
-                    total += expense.get('amount', 0)
-                
-            # Calculate average
-            average = total / count if count > 0 else 0
+            # Calculate statistics in the format expected by frontend
+            amounts = [exp.get('amount', 0) for exp in expenses]
+            total_amount = sum(amounts)
+            avg_amount = total_amount / len(amounts) if amounts else 0
+            max_amount = max(amounts) if amounts else 0
+            min_amount = min(amounts) if amounts else 0
             
-            # Prepare summary
-            summary = {
-                'total': total,
-                'average': average,
-                'count': count,
-                'start_date': start_date or datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat() + 'Z',
-                'end_date': end_date or datetime.utcnow().isoformat() + 'Z',
-                'group_by': group_by
+            # Category breakdown
+            categories = {}
+            for expense in expenses:
+                cat = expense.get('category', 'Uncategorized')
+                categories[cat] = categories.get(cat, 0) + expense.get('amount', 0)
+            
+            # Monthly breakdown
+            monthly = {}
+            for expense in expenses:
+                date = expense.get('date', datetime.utcnow())
+                month_key = date.strftime('%Y-%m')
+                monthly[month_key] = monthly.get(month_key, 0) + expense.get('amount', 0)
+            
+            # FIXED: Return statistics in the format expected by ExpenseStatistics.fromJson()
+            statistics_data = {
+                'totals': {
+                    'count': len(expenses),
+                    'totalAmount': total_amount,
+                    'averageAmount': avg_amount,
+                    'maxAmount': max_amount,
+                    'minAmount': min_amount
+                },
+                'breakdown': {
+                    'byCategory': categories,
+                    'byMonth': monthly
+                },
+                'insights': {
+                    'topCategory': max(categories.items(), key=lambda x: x[1])[0] if categories else 'None',
+                    'topCategoryAmount': max(categories.values()) if categories else 0,
+                    'categoriesCount': len(categories)
+                }
             }
             
             return jsonify({
                 'success': True,
                 'data': {
-                    'statistics': dict(statistics),
-                    'summary': summary
+                    'statistics': statistics_data
                 },
                 'message': 'Expense statistics retrieved successfully'
             })
             
         except Exception as e:
+            print(f"Error in get_expense_statistics: {e}")
             return jsonify({
                 'success': False,
                 'message': 'Failed to retrieve expense statistics',
