@@ -1879,7 +1879,7 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                 'errors': {'general': [str(e)]}
             }), 500
 
-    @admin_bp.route('/subscriptions', methods=['GET'])
+        @admin_bp.route('/subscriptions', methods=['GET'])
     @token_required
     @admin_required
     def get_all_subscriptions(current_user):
@@ -1984,6 +1984,6 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                 'message': 'Failed to retrieve subscriptions',
                 'errors': {'general': [str(e)]}
             }), 500
-         
-    
-return admin_bp
+
+
+    return admin_bp
