@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
 from bson import ObjectId
 from utils.payment_utils import normalize_payment_method, validate_payment_method
+from utils.monthly_entry_tracker import MonthlyEntryTracker
 
 expenses_bp = Blueprint('expenses', __name__, url_prefix='/expenses')
 
@@ -135,6 +136,26 @@ def create_expense():
                     'errors': errors
                 }), 400
            
+            # NEW: Check monthly entry limit for free tier users
+            entry_tracker = MonthlyEntryTracker(expenses_bp.mongo)
+            fc_check = entry_tracker.should_deduct_fc(current_user['_id'], 'expense')
+            
+            # If FC deduction is required, check user has sufficient credits
+            if fc_check['deduct_fc']:
+                user = expenses_bp.mongo.db.users.find_one({'_id': current_user['_id']})
+                current_balance = user.get('ficoreCreditBalance', 0.0)
+                
+                if current_balance < fc_check['fc_cost']:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Insufficient credits. {fc_check["reason"]}',
+                        'data': {
+                            'required_credits': fc_check['fc_cost'],
+                            'current_balance': current_balance,
+                            'monthly_data': fc_check['monthly_data']
+                        }
+                    }), 402  # Payment Required
+           
             raw_payment = data.get('paymentMethod')
             normalized_payment = normalize_payment_method(raw_payment) if raw_payment is not None else 'cash'
             if raw_payment is not None and not validate_payment_method(raw_payment):
@@ -161,6 +182,39 @@ def create_expense():
            
             result = expenses_bp.mongo.db.expenses.insert_one(expense_data)
             expense_id = str(result.inserted_id)
+            
+            # NEW: Deduct FC if required (over monthly limit)
+            if fc_check['deduct_fc']:
+                # Deduct credits from user account
+                user = expenses_bp.mongo.db.users.find_one({'_id': current_user['_id']})
+                current_balance = user.get('ficoreCreditBalance', 0.0)
+                new_balance = current_balance - fc_check['fc_cost']
+                
+                expenses_bp.mongo.db.users.update_one(
+                    {'_id': current_user['_id']},
+                    {'$set': {'ficoreCreditBalance': new_balance}}
+                )
+                
+                # Create transaction record
+                transaction = {
+                    '_id': ObjectId(),
+                    'userId': current_user['_id'],
+                    'type': 'debit',
+                    'amount': fc_check['fc_cost'],
+                    'description': f'Expense entry over monthly limit (entry #{fc_check["monthly_data"]["count"] + 1})',
+                    'operation': 'create_expense_over_limit',
+                    'balanceBefore': current_balance,
+                    'balanceAfter': new_balance,
+                    'status': 'completed',
+                    'createdAt': datetime.utcnow(),
+                    'metadata': {
+                        'operation': 'create_expense_over_limit',
+                        'deductionType': 'monthly_limit_exceeded',
+                        'monthly_data': fc_check['monthly_data']
+                    }
+                }
+                
+                expenses_bp.mongo.db.credit_transactions.insert_one(transaction)
            
             created_expense = expenses_bp.serialize_doc(expense_data.copy())
             created_expense['id'] = expense_id

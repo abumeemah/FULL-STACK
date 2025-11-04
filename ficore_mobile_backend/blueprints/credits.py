@@ -6,9 +6,17 @@ import uuid
 import os
 import base64
 import traceback
+import requests
+import hmac
+import hashlib
 
 def init_credits_blueprint(mongo, token_required, serialize_doc):
     credits_bp = Blueprint('credits', __name__, url_prefix='/credits')
+    
+    # Paystack configuration for FC purchases
+    PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY', 'sk_test_your_secret_key')
+    PAYSTACK_PUBLIC_KEY = os.getenv('PAYSTACK_PUBLIC_KEY', 'pk_test_your_public_key')
+    PAYSTACK_BASE_URL = 'https://api.paystack.co'
     
     # Credit top-up configuration - Users buy FiCore Credits at ₦50 per credit
     CREDIT_PACKAGES = [
@@ -30,6 +38,30 @@ def init_credits_blueprint(mongo, token_required, serialize_doc):
     def allowed_file(filename):
         """Check if file extension is allowed"""
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+    def _make_paystack_request(endpoint, method='GET', data=None):
+        """Make authenticated request to Paystack API"""
+        headers = {
+            'Authorization': f'Bearer {PAYSTACK_SECRET_KEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        url = f"{PAYSTACK_BASE_URL}{endpoint}"
+        
+        try:
+            if method == 'GET':
+                response = requests.get(url, headers=headers)
+            elif method == 'POST':
+                response = requests.post(url, headers=headers, json=data)
+            elif method == 'PUT':
+                response = requests.put(url, headers=headers, json=data)
+            else:
+                raise ValueError(f"Unsupported HTTP method: {method}")
+            
+            return response.json()
+        except Exception as e:
+            print(f"Paystack API error: {str(e)}")
+            return {'status': False, 'message': f'Payment service error: {str(e)}'}
 
     @credits_bp.route('/topup-options', methods=['GET'])
     @token_required
@@ -214,6 +246,400 @@ def init_credits_blueprint(mongo, token_required, serialize_doc):
                 'message': 'Failed to retrieve credit history',
                 'errors': {'general': [str(e)]}
             }), 500
+
+    @credits_bp.route('/purchase/initialize', methods=['POST'])
+    @token_required
+    def initialize_credit_purchase(current_user):
+        """Initialize automated FC purchase with Paystack"""
+        try:
+            data = request.get_json()
+            
+            # Validate required fields
+            if 'credits' not in data:
+                return jsonify({
+                    'success': False,
+                    'message': 'Missing required field: credits'
+                }), 400
+            
+            credit_amount = float(data['credits'])
+            
+            # Find the matching package
+            selected_package = None
+            for package in CREDIT_PACKAGES:
+                if package['credits'] == credit_amount:
+                    selected_package = package
+                    break
+            
+            if selected_package is None:
+                valid_credits = [str(pkg['credits']) for pkg in CREDIT_PACKAGES]
+                return jsonify({
+                    'success': False,
+                    'message': f'Invalid credit amount. Available packages: {", ".join(valid_credits)} FCs'
+                }), 400
+
+            naira_amount = selected_package['naira']
+            
+            # Get user email for Paystack
+            user = mongo.db.users.find_one({'_id': current_user['_id']})
+            user_email = user.get('email', 'user@example.com')
+            
+            # Create transaction reference
+            transaction_ref = f"fc_purchase_{current_user['_id']}_{uuid.uuid4().hex[:8]}"
+            
+            # Initialize Paystack transaction
+            paystack_data = {
+                'email': user_email,
+                'amount': int(naira_amount * 100),  # Paystack expects kobo
+                'reference': transaction_ref,
+                'currency': 'NGN',
+                'callback_url': data.get('callback_url', ''),
+                'metadata': {
+                    'user_id': str(current_user['_id']),
+                    'credit_amount': credit_amount,
+                    'naira_amount': naira_amount,
+                    'package_type': 'fc_purchase'
+                }
+            }
+            
+            paystack_response = _make_paystack_request('/transaction/initialize', 'POST', paystack_data)
+            
+            if not paystack_response.get('status'):
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to initialize payment',
+                    'errors': {'payment': [paystack_response.get('message', 'Payment service error')]}
+                }), 400
+            
+            # Store pending transaction
+            pending_transaction = {
+                '_id': ObjectId(),
+                'userId': current_user['_id'],
+                'transactionRef': transaction_ref,
+                'paystackRef': paystack_response['data']['reference'],
+                'accessCode': paystack_response['data']['access_code'],
+                'creditAmount': credit_amount,
+                'nairaAmount': naira_amount,
+                'status': 'pending',
+                'paymentMethod': 'paystack',
+                'createdAt': datetime.utcnow(),
+                'expiresAt': datetime.utcnow() + timedelta(minutes=15)  # 15 min expiry
+            }
+            
+            mongo.db.pending_credit_purchases.insert_one(pending_transaction)
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'transactionRef': transaction_ref,
+                    'paystackRef': paystack_response['data']['reference'],
+                    'accessCode': paystack_response['data']['access_code'],
+                    'authorizationUrl': paystack_response['data']['authorization_url'],
+                    'creditAmount': credit_amount,
+                    'nairaAmount': naira_amount,
+                    'expiresAt': pending_transaction['expiresAt'].isoformat() + 'Z'
+                },
+                'message': 'Payment initialized successfully'
+            })
+            
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid credit amount format'
+            }), 400
+        except Exception as e:
+            print(f"Error initializing credit purchase: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to initialize credit purchase',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @credits_bp.route('/purchase/verify', methods=['POST'])
+    @token_required
+    def verify_credit_purchase(current_user):
+        """Verify Paystack payment and credit user account"""
+        try:
+            data = request.get_json()
+            
+            if 'reference' not in data:
+                return jsonify({
+                    'success': False,
+                    'message': 'Missing payment reference'
+                }), 400
+            
+            reference = data['reference']
+            
+            # Find pending transaction
+            pending_transaction = mongo.db.pending_credit_purchases.find_one({
+                'userId': current_user['_id'],
+                'paystackRef': reference,
+                'status': 'pending'
+            })
+            
+            if not pending_transaction:
+                return jsonify({
+                    'success': False,
+                    'message': 'Transaction not found or already processed'
+                }), 404
+            
+            # Check if transaction has expired
+            if datetime.utcnow() > pending_transaction['expiresAt']:
+                mongo.db.pending_credit_purchases.update_one(
+                    {'_id': pending_transaction['_id']},
+                    {'$set': {'status': 'expired'}}
+                )
+                return jsonify({
+                    'success': False,
+                    'message': 'Transaction has expired'
+                }), 400
+            
+            # Verify payment with Paystack
+            paystack_response = _make_paystack_request(f'/transaction/verify/{reference}')
+            
+            if not paystack_response.get('status'):
+                return jsonify({
+                    'success': False,
+                    'message': 'Payment verification failed',
+                    'errors': {'payment': [paystack_response.get('message', 'Verification error')]}
+                }), 400
+            
+            payment_data = paystack_response['data']
+            
+            # Check payment status
+            if payment_data['status'] != 'success':
+                mongo.db.pending_credit_purchases.update_one(
+                    {'_id': pending_transaction['_id']},
+                    {'$set': {'status': 'failed', 'failureReason': payment_data.get('gateway_response', 'Payment failed')}}
+                )
+                return jsonify({
+                    'success': False,
+                    'message': f'Payment failed: {payment_data.get("gateway_response", "Unknown error")}'
+                }), 400
+            
+            # Verify amount matches
+            expected_amount = int(pending_transaction['nairaAmount'] * 100)  # Convert to kobo
+            if payment_data['amount'] != expected_amount:
+                return jsonify({
+                    'success': False,
+                    'message': 'Payment amount mismatch'
+                }), 400
+            
+            # Credit user account
+            user = mongo.db.users.find_one({'_id': current_user['_id']})
+            current_balance = user.get('ficoreCreditBalance', 0.0)
+            new_balance = current_balance + pending_transaction['creditAmount']
+            
+            mongo.db.users.update_one(
+                {'_id': current_user['_id']},
+                {'$set': {'ficoreCreditBalance': new_balance}}
+            )
+            
+            # Create completed transaction record
+            transaction = {
+                '_id': ObjectId(),
+                'userId': current_user['_id'],
+                'type': 'credit',
+                'amount': pending_transaction['creditAmount'],
+                'nairaAmount': pending_transaction['nairaAmount'],
+                'description': f'FC purchase via Paystack - {pending_transaction["creditAmount"]} FCs',
+                'status': 'completed',
+                'paymentMethod': 'paystack',
+                'paymentReference': reference,
+                'paystackTransactionId': payment_data.get('id'),
+                'balanceBefore': current_balance,
+                'balanceAfter': new_balance,
+                'createdAt': datetime.utcnow(),
+                'metadata': {
+                    'purchaseType': 'paystack_automated',
+                    'paystackData': {
+                        'transaction_id': payment_data.get('id'),
+                        'gateway_response': payment_data.get('gateway_response'),
+                        'paid_at': payment_data.get('paid_at'),
+                        'channel': payment_data.get('channel')
+                    }
+                }
+            }
+            
+            mongo.db.credit_transactions.insert_one(transaction)
+            
+            # Mark pending transaction as completed
+            mongo.db.pending_credit_purchases.update_one(
+                {'_id': pending_transaction['_id']},
+                {
+                    '$set': {
+                        'status': 'completed',
+                        'completedAt': datetime.utcnow(),
+                        'transactionId': str(transaction['_id'])
+                    }
+                }
+            )
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'transactionId': str(transaction['_id']),
+                    'creditAmount': pending_transaction['creditAmount'],
+                    'nairaAmount': pending_transaction['nairaAmount'],
+                    'previousBalance': current_balance,
+                    'newBalance': new_balance,
+                    'paymentReference': reference
+                },
+                'message': f'Payment successful! {pending_transaction["creditAmount"]} FCs added to your account'
+            })
+            
+        except Exception as e:
+            print(f"Error verifying credit purchase: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to verify payment',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @credits_bp.route('/purchase/status/<reference>', methods=['GET'])
+    @token_required
+    def get_purchase_status(current_user, reference):
+        """Get status of a credit purchase transaction"""
+        try:
+            # Check pending transactions first
+            pending_transaction = mongo.db.pending_credit_purchases.find_one({
+                'userId': current_user['_id'],
+                'paystackRef': reference
+            })
+            
+            if pending_transaction:
+                transaction_data = serialize_doc(pending_transaction.copy())
+                transaction_data['createdAt'] = transaction_data.get('createdAt', datetime.utcnow()).isoformat() + 'Z'
+                transaction_data['expiresAt'] = transaction_data.get('expiresAt', datetime.utcnow()).isoformat() + 'Z'
+                
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'status': transaction_data['status'],
+                        'transaction': transaction_data
+                    },
+                    'message': 'Transaction status retrieved'
+                })
+            
+            # Check completed transactions
+            completed_transaction = mongo.db.credit_transactions.find_one({
+                'userId': current_user['_id'],
+                'paymentReference': reference
+            })
+            
+            if completed_transaction:
+                transaction_data = serialize_doc(completed_transaction.copy())
+                transaction_data['createdAt'] = transaction_data.get('createdAt', datetime.utcnow()).isoformat() + 'Z'
+                
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'status': 'completed',
+                        'transaction': transaction_data
+                    },
+                    'message': 'Transaction completed'
+                })
+            
+            return jsonify({
+                'success': False,
+                'message': 'Transaction not found'
+            }), 404
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to get transaction status',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @credits_bp.route('/webhook/paystack', methods=['POST'])
+    def paystack_webhook():
+        """Handle Paystack webhook notifications"""
+        try:
+            # Verify webhook signature
+            signature = request.headers.get('X-Paystack-Signature')
+            if not signature:
+                return jsonify({'error': 'No signature provided'}), 400
+            
+            # Compute expected signature
+            payload = request.get_data()
+            expected_signature = hmac.new(
+                PAYSTACK_SECRET_KEY.encode('utf-8'),
+                payload,
+                hashlib.sha512
+            ).hexdigest()
+            
+            if not hmac.compare_digest(signature, expected_signature):
+                return jsonify({'error': 'Invalid signature'}), 400
+            
+            # Process webhook event
+            event_data = request.get_json()
+            event_type = event_data.get('event')
+            
+            if event_type == 'charge.success':
+                data = event_data['data']
+                reference = data['reference']
+                
+                # Find pending transaction
+                pending_transaction = mongo.db.pending_credit_purchases.find_one({
+                    'paystackRef': reference,
+                    'status': 'pending'
+                })
+                
+                if pending_transaction:
+                    # Process the successful payment
+                    user_id = pending_transaction['userId']
+                    credit_amount = pending_transaction['creditAmount']
+                    
+                    # Update user balance
+                    user = mongo.db.users.find_one({'_id': user_id})
+                    current_balance = user.get('ficoreCreditBalance', 0.0)
+                    new_balance = current_balance + credit_amount
+                    
+                    mongo.db.users.update_one(
+                        {'_id': user_id},
+                        {'$set': {'ficoreCreditBalance': new_balance}}
+                    )
+                    
+                    # Create transaction record
+                    transaction = {
+                        '_id': ObjectId(),
+                        'userId': user_id,
+                        'type': 'credit',
+                        'amount': credit_amount,
+                        'nairaAmount': pending_transaction['nairaAmount'],
+                        'description': f'FC purchase via Paystack webhook - {credit_amount} FCs',
+                        'status': 'completed',
+                        'paymentMethod': 'paystack',
+                        'paymentReference': reference,
+                        'paystackTransactionId': data.get('id'),
+                        'balanceBefore': current_balance,
+                        'balanceAfter': new_balance,
+                        'createdAt': datetime.utcnow(),
+                        'metadata': {
+                            'purchaseType': 'paystack_webhook',
+                            'webhookEvent': event_type
+                        }
+                    }
+                    
+                    mongo.db.credit_transactions.insert_one(transaction)
+                    
+                    # Mark pending transaction as completed
+                    mongo.db.pending_credit_purchases.update_one(
+                        {'_id': pending_transaction['_id']},
+                        {
+                            '$set': {
+                                'status': 'completed',
+                                'completedAt': datetime.utcnow(),
+                                'transactionId': str(transaction['_id'])
+                            }
+                        }
+                    )
+            
+            return jsonify({'status': 'success'}), 200
+            
+        except Exception as e:
+            print(f"Webhook error: {str(e)}")
+            return jsonify({'error': 'Webhook processing failed'}), 500
 
     @credits_bp.route('/request', methods=['POST'])
     @token_required
@@ -913,6 +1339,30 @@ def init_credits_blueprint(mongo, token_required, serialize_doc):
             return jsonify({
                 'success': False,
                 'message': 'Failed to upload receipt',
+                'errors': {'general': [str(e)]}
+            }), 500
+
+    @credits_bp.route('/monthly-entries', methods=['GET'])
+    @token_required
+    def get_monthly_entries_status(current_user):
+        """Get user's monthly Income & Expense entry status for free tier"""
+        try:
+            from utils.monthly_entry_tracker import MonthlyEntryTracker
+            
+            entry_tracker = MonthlyEntryTracker(mongo)
+            monthly_stats = entry_tracker.get_monthly_stats(current_user['_id'])
+            
+            return jsonify({
+                'success': True,
+                'data': monthly_stats,
+                'message': 'Monthly entry status retrieved successfully'
+            })
+
+        except Exception as e:
+            print(f"Error in get_monthly_entries_status: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve monthly entry status',
                 'errors': {'general': [str(e)]}
             }), 500
 

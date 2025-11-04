@@ -5,6 +5,7 @@ import csv
 import io
 from collections import defaultdict
 from utils.payment_utils import normalize_sales_type, validate_sales_type
+from utils.monthly_entry_tracker import MonthlyEntryTracker
 
 def init_income_blueprint(mongo, token_required, serialize_doc):
     """Initialize the income blueprint with database and auth decorator"""
@@ -153,8 +154,28 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
                     'errors': errors
                 }), 400
             
-            # NOTE: Credit checking and deduction is handled by frontend executeWithCredits()
-            # No need to check/deduct credits here to avoid double deduction
+            # NEW: Check monthly entry limit for free tier users
+            entry_tracker = MonthlyEntryTracker(mongo)
+            fc_check = entry_tracker.should_deduct_fc(current_user['_id'], 'income')
+            
+            # If FC deduction is required, check user has sufficient credits
+            if fc_check['deduct_fc']:
+                user = mongo.db.users.find_one({'_id': current_user['_id']})
+                current_balance = user.get('ficoreCreditBalance', 0.0)
+                
+                if current_balance < fc_check['fc_cost']:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Insufficient credits. {fc_check["reason"]}',
+                        'data': {
+                            'required_credits': fc_check['fc_cost'],
+                            'current_balance': current_balance,
+                            'monthly_data': fc_check['monthly_data']
+                        }
+                    }), 402  # Payment Required
+            
+            # NOTE: If within free limit, no FC deduction needed
+            # If over limit, FC will be deducted after successful creation
             
             # Simplified: No recurring logic - all incomes are one-time entries
             
@@ -186,8 +207,38 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
             result = mongo.db.incomes.insert_one(income_data)
             income_id = str(result.inserted_id)
             
-            # NOTE: Credit deduction is handled by frontend executeWithCredits()
-            # to avoid double deduction
+            # NEW: Deduct FC if required (over monthly limit)
+            if fc_check['deduct_fc']:
+                # Deduct credits from user account
+                user = mongo.db.users.find_one({'_id': current_user['_id']})
+                current_balance = user.get('ficoreCreditBalance', 0.0)
+                new_balance = current_balance - fc_check['fc_cost']
+                
+                mongo.db.users.update_one(
+                    {'_id': current_user['_id']},
+                    {'$set': {'ficoreCreditBalance': new_balance}}
+                )
+                
+                # Create transaction record
+                transaction = {
+                    '_id': ObjectId(),
+                    'userId': current_user['_id'],
+                    'type': 'debit',
+                    'amount': fc_check['fc_cost'],
+                    'description': f'Income entry over monthly limit (entry #{fc_check["monthly_data"]["count"] + 1})',
+                    'operation': 'create_income_over_limit',
+                    'balanceBefore': current_balance,
+                    'balanceAfter': new_balance,
+                    'status': 'completed',
+                    'createdAt': datetime.utcnow(),
+                    'metadata': {
+                        'operation': 'create_income_over_limit',
+                        'deductionType': 'monthly_limit_exceeded',
+                        'monthly_data': fc_check['monthly_data']
+                    }
+                }
+                
+                mongo.db.credit_transactions.insert_one(transaction)
             
             # FIXED: Return full income data like other endpoints
             created_income = serialize_doc(income_data.copy())
@@ -752,7 +803,7 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
                 'success': False,
                 'message': 'Failed to retrieve income statistics',
                 'errors': {'general': [str(e)]}
-            }), 500
+            }), 500n date range
             incomes = list(mongo.db.incomes.find({
                 'userId': current_user['_id'],
                 'dateReceived': {
@@ -913,5 +964,4 @@ def init_income_blueprint(mongo, token_required, serialize_doc):
             }), 500
 
     return income_bp
-
 
