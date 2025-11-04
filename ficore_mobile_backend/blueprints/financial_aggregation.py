@@ -502,9 +502,8 @@ def init_financial_aggregation_blueprint(mongo, token_required, serialize_doc):
                 'message': 'Failed to retrieve monthly totals',
                 'errors': {'general': [str(e)]}
             }), 500
-    
-    return financial_aggregation_bp    
-@financial_aggregation_bp.route('/ytd-counts', methods=['GET'])
+
+    @financial_aggregation_bp.route('/ytd-counts', methods=['GET'])
     @token_required
     def get_ytd_counts(current_user):
         """
