@@ -268,15 +268,23 @@ def init_financial_aggregation_blueprint(mongo, token_required, serialize_doc):
                 } for item in expense_counts
             }
             
-            # Calculate totals
+            # Calculate totals - CRITICAL FIX: Include expense amounts for YTD calculations
             total_income_count = sum(item['count'] for item in income_counts)
             total_expense_count = sum(item['count'] for item in expense_counts)
+            
+            # CRITICAL FIX: Calculate total YTD amounts (not just counts)
+            total_income_amount = sum(item['totalAmount'] for item in income_counts)
+            total_expense_amount = sum(item['totalAmount'] for item in expense_counts)
             
             result = {
                 'year': now.year,
                 'totalIncomeRecords': total_income_count,
                 'totalExpenseRecords': total_expense_count,
                 'totalRecords': total_income_count + total_expense_count,
+                # CRITICAL FIX: Add the missing YTD expense total that frontend expects
+                'totalIncome': total_income_amount,
+                'totalExpenses': total_expense_amount,
+                'netIncome': total_income_amount - total_expense_amount,
                 'incomeByCategory': income_by_category,
                 'expenseByCategory': expense_by_category,
                 'lastCalculated': now.isoformat() + 'Z',
@@ -360,9 +368,13 @@ def init_financial_aggregation_blueprint(mongo, token_required, serialize_doc):
             income_by_category = {item['_id']: {'count': item['count'], 'amount': item['totalAmount']} for item in income_counts}
             expense_by_category = {item['_id']: {'count': item['count'], 'amount': item['totalAmount']} for item in expense_counts}
             
-            # Calculate totals
+            # Calculate totals - CRITICAL FIX: Include expense amounts for all-time calculations
             total_income_count = sum(item['count'] for item in income_counts)
             total_expense_count = sum(item['count'] for item in expense_counts)
+            
+            # CRITICAL FIX: Calculate total all-time amounts (not just counts)
+            total_income_amount = sum(item['totalAmount'] for item in income_counts)
+            total_expense_amount = sum(item['totalAmount'] for item in expense_counts)
             
             # Get earliest and latest transaction dates for period info
             earliest_income = self.db.incomes.find_one({'userId': user_id}, sort=[('dateReceived', 1)])
@@ -382,6 +394,10 @@ def init_financial_aggregation_blueprint(mongo, token_required, serialize_doc):
                 'totalIncomeRecords': total_income_count,
                 'totalExpenseRecords': total_expense_count,
                 'totalRecords': total_income_count + total_expense_count,
+                # CRITICAL FIX: Add the missing all-time expense total that frontend expects
+                'totalIncome': total_income_amount,
+                'totalExpenses': total_expense_amount,
+                'netIncome': total_income_amount - total_expense_amount,
                 'incomeByCategory': income_by_category,
                 'expenseByCategory': expense_by_category,
                 'lastCalculated': now.isoformat() + 'Z',
