@@ -43,11 +43,11 @@ app.config['JWT_EXPIRATION_DELTA'] = timedelta(hours=24)
 CORS(app, origins=['*'])
 mongo = PyMongo(app)
 
-# Initialize rate limiter
+# Initialize rate limiter with more reasonable limits
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"],
+    default_limits=["1000 per day", "200 per hour"],
     storage_uri="memory://",
 )
 

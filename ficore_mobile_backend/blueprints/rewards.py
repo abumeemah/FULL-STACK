@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from bson import ObjectId
 import traceback
 
-def init_rewards_blueprint(mongo, token_required, serialize_doc):
+def init_rewards_blueprint(mongo, token_required, serialize_doc, limiter=None):
     rewards_bp = Blueprint('rewards', __name__, url_prefix='/rewards')
     
     # Reward configuration - FC costs for exclusive benefits
@@ -241,6 +241,45 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
 
             action = data['action']
             module = data['module']
+            
+            # Prevent duplicate activity tracking within a short time window (5 minutes)
+            activity_key = f"{action}_{module}"
+            current_time = datetime.utcnow()
+            
+            # Check for recent activity tracking
+            recent_activity = mongo.db.activity_tracking.find_one({
+                'user_id': current_user['_id'],
+                'activity_key': activity_key,
+                'timestamp': {'$gte': current_time - timedelta(minutes=5)}
+            })
+            
+            if recent_activity:
+                # Return success without processing to avoid duplicate tracking
+                return jsonify({
+                    'success': True,
+                    'message': 'Activity already tracked recently',
+                    'duplicate_prevented': True
+                })
+            
+            # Record this activity tracking attempt
+            mongo.db.activity_tracking.insert_one({
+                '_id': ObjectId(),
+                'user_id': current_user['_id'],
+                'activity_key': activity_key,
+                'action': action,
+                'module': module,
+                'timestamp': current_time
+            })
+            
+            # Clean up old activity tracking records (older than 1 hour) to prevent collection bloat
+            try:
+                cleanup_threshold = current_time - timedelta(hours=1)
+                mongo.db.activity_tracking.delete_many({
+                    'timestamp': {'$lt': cleanup_threshold}
+                })
+            except Exception as cleanup_error:
+                # Don't fail the request if cleanup fails
+                print(f"Activity tracking cleanup error: {str(cleanup_error)}")
             
             # Get or create rewards record
             rewards_record = mongo.db.rewards.find_one({'user_id': current_user['_id']})
@@ -883,5 +922,29 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc):
             return f"Increased {reward_config['limit_key']} by {reward_config['limit_amount']}"
         
         return "Benefit applied successfully"
+
+    def _ensure_activity_tracking_indexes(mongo):
+        """Ensure proper indexes exist for activity tracking collection"""
+        try:
+            # Create compound index for efficient duplicate checking
+            mongo.db.activity_tracking.create_index([
+                ('user_id', 1),
+                ('activity_key', 1),
+                ('timestamp', -1)
+            ])
+            
+            # Create TTL index to automatically clean up old records after 2 hours
+            mongo.db.activity_tracking.create_index(
+                'timestamp',
+                expireAfterSeconds=7200  # 2 hours in seconds
+            )
+        except Exception as e:
+            print(f"Error creating activity tracking indexes: {str(e)}")
+    
+    # Ensure indexes are created when blueprint is initialized
+    try:
+        _ensure_activity_tracking_indexes(mongo)
+    except Exception as e:
+        print(f"Error during index initialization: {str(e)}")
 
     return rewards_bp
