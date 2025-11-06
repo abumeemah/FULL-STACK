@@ -619,22 +619,47 @@ class DatabaseInitializer:
                 
                 # Create indexes (will skip if they already exist)
                 collection = self.db[collection_name]
+                existing_indexes = collection.index_information()
+                
                 for index_def in indexes:
+                    index_name = index_def.get('name')
+                    index_keys = index_def['keys']
+                    
+                    # Check if index already exists by name
+                    if index_name and index_name in existing_indexes:
+                        print(f"  ✓ Index '{index_name}' already exists on '{collection_name}'")
+                        continue
+                    
+                    # Check if an index with the same key pattern already exists (different name)
+                    index_exists_with_different_name = False
+                    for existing_name, existing_info in existing_indexes.items():
+                        if existing_name != '_id_':  # Skip the default _id index
+                            existing_keys = existing_info.get('key', [])
+                            # Convert to list of tuples for comparison
+                            existing_keys_list = list(existing_keys.items()) if isinstance(existing_keys, dict) else existing_keys
+                            if existing_keys_list == index_keys:
+                                print(f"  ✓ Index with same keys already exists as '{existing_name}' on '{collection_name}' (skipping '{index_name}')")
+                                index_exists_with_different_name = True
+                                break
+                    
+                    if index_exists_with_different_name:
+                        continue
+                    
                     try:
-                        index_name = collection.create_index(
+                        created_index_name = collection.create_index(
                             index_def['keys'],
                             unique=index_def.get('unique', False),
                             sparse=index_def.get('sparse', False),
-                            name=index_def.get('name')
+                            name=index_name
                         )
-                        results['indexes_created'].append(f"{collection_name}.{index_name}")
-                        print(f"  ✓ Created index '{index_name}' on '{collection_name}'")
+                        results['indexes_created'].append(f"{collection_name}.{created_index_name}")
+                        print(f"  ✓ Created index '{created_index_name}' on '{collection_name}'")
                     except Exception as index_error:
-                        # Index might already exist, which is fine
-                        if 'already exists' in str(index_error).lower():
-                            print(f"  ✓ Index '{index_def.get('name')}' already exists on '{collection_name}'")
+                        # Handle specific error cases
+                        if 'already exists' in str(index_error).lower() or 'duplicate key' in str(index_error).lower():
+                            print(f"  ✓ Index '{index_name}' already exists on '{collection_name}'")
                         else:
-                            error_msg = f"Failed to create index on {collection_name}: {str(index_error)}"
+                            error_msg = f"Failed to create index '{index_name}' on {collection_name}: {str(index_error)}"
                             results['errors'].append(error_msg)
                             print(f"  ✗ {error_msg}")
             

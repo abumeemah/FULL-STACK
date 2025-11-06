@@ -35,6 +35,15 @@ class MonthlyEntryTracker:
         """
         month_key = self.get_current_month_key()
         
+        # Check if user is Premium subscriber FIRST
+        user = self.mongo.db.users.find_one({'_id': user_id})
+        is_premium = False
+        if user:
+            is_subscribed = user.get('isSubscribed', False)
+            subscription_end = user.get('subscriptionEndDate')
+            if is_subscribed and subscription_end and subscription_end > datetime.utcnow():
+                is_premium = True
+        
         # Count Income entries for current month
         income_count = self.mongo.db.incomes.count_documents({
             'userId': user_id,
@@ -54,9 +63,16 @@ class MonthlyEntryTracker:
         })
         
         total_count = income_count + expense_count
-        limit = 100  # Free tier limit
-        remaining = max(0, limit - total_count)
-        is_over_limit = total_count >= limit
+        
+        # CRITICAL FIX: Premium users get unlimited entries
+        if is_premium:
+            limit = 999999  # Unlimited for Premium users
+            remaining = 999999  # Always unlimited remaining
+            is_over_limit = False  # Premium users never over limit
+        else:
+            limit = 100  # Free tier limit
+            remaining = max(0, limit - total_count)
+            is_over_limit = total_count >= limit
         
         return {
             'count': total_count,
@@ -129,7 +145,21 @@ class MonthlyEntryTracker:
             'monthly_data': dict
         }
         """
-        # Check entry allowance first
+        # CRITICAL FIX: Check Premium status FIRST - Premium users NEVER pay FC for entries
+        user = self.mongo.db.users.find_one({'_id': user_id})
+        if user:
+            is_subscribed = user.get('isSubscribed', False)
+            subscription_end = user.get('subscriptionEndDate')
+            if is_subscribed and subscription_end and subscription_end > datetime.utcnow():
+                # Premium users: FC balance is NEVER touched
+                return {
+                    'deduct_fc': False,
+                    'reason': 'Premium subscription active - FC balance preserved',
+                    'fc_cost': 0.0,
+                    'monthly_data': self.get_user_monthly_count(user_id)
+                }
+        
+        # Check entry allowance for Free users only
         entry_check = self.check_entry_allowed(user_id, entry_type)
         
         if not entry_check['allowed']:
@@ -190,10 +220,18 @@ class MonthlyEntryTracker:
             else:
                 is_subscribed = False
         
-        return {
+        # CRITICAL FIX: Premium users don't have monthly reset dates
+        result = {
             **monthly_data,
             'is_subscribed': is_subscribed,
             'subscription_type': subscription_type,
-            'tier': 'Premium' if is_subscribed else 'Free',
-            'next_reset_date': self._get_month_end().isoformat() + 'Z'
+            'tier': 'Premium' if is_subscribed else 'Free'
         }
+        
+        # Only add reset date for Free users (Premium users don't have monthly resets)
+        if not is_subscribed:
+            result['next_reset_date'] = self._get_month_end().isoformat() + 'Z'
+        else:
+            result['next_reset_date'] = None  # No resets for Premium users
+        
+        return result

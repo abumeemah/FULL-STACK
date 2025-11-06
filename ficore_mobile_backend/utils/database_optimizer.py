@@ -137,15 +137,29 @@ class DatabaseOptimizer:
             for index_def in indexes:
                 try:
                     # Check if index already exists
-                    existing_indexes = collection.list_indexes()
-                    index_exists = any(
+                    existing_indexes = list(collection.list_indexes())
+                    index_exists_by_name = any(
                         idx.get('name') == index_def['name'] 
                         for idx in existing_indexes
                     )
                     
-                    if index_exists:
+                    # Check if an index with the same key pattern already exists (different name)
+                    index_exists_by_keys = any(
+                        list(idx.get('key', {}).items()) == index_def['keys']
+                        for idx in existing_indexes
+                        if idx.get('name') != '_id_'  # Skip the default _id index
+                    )
+                    
+                    if index_exists_by_name:
                         results['existing'].append(f"{collection_name}.{index_def['name']}")
                         logger.info(f"Index {index_def['name']} already exists on {collection_name}")
+                    elif index_exists_by_keys:
+                        existing_name = next(
+                            idx.get('name') for idx in existing_indexes 
+                            if list(idx.get('key', {}).items()) == index_def['keys'] and idx.get('name') != '_id_'
+                        )
+                        results['existing'].append(f"{collection_name}.{index_def['name']} (exists as {existing_name})")
+                        logger.info(f"Index with same keys already exists as '{existing_name}' on {collection_name} (skipping '{index_def['name']}')")
                     else:
                         # Create index
                         index_name = collection.create_index(
