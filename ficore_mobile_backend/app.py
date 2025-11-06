@@ -16,6 +16,7 @@ from blueprints.users import users_bp, init_users_blueprint
 from blueprints.income import init_income_blueprint
 from blueprints.expenses import expenses_bp, init_expenses_blueprint
 from blueprints.financial_aggregation import init_financial_aggregation_blueprint
+from blueprints.analytics import init_analytics_blueprint
 
 from blueprints.credits import init_credits_blueprint
 from blueprints.summaries import init_summaries_blueprint
@@ -239,6 +240,7 @@ users_blueprint = init_users_blueprint(mongo, token_required)
 income_blueprint = init_income_blueprint(mongo, token_required, serialize_doc)
 expenses_blueprint = init_expenses_blueprint(mongo, token_required, serialize_doc)
 financial_aggregation_blueprint = init_financial_aggregation_blueprint(mongo, token_required, serialize_doc)
+analytics_blueprint = init_analytics_blueprint(mongo, token_required, serialize_doc)
 
 credits_blueprint = init_credits_blueprint(mongo, token_required, serialize_doc)
 summaries_blueprint = init_summaries_blueprint(mongo, token_required, serialize_doc)
@@ -258,6 +260,7 @@ app.register_blueprint(users_blueprint)
 app.register_blueprint(income_blueprint)
 app.register_blueprint(expenses_blueprint)
 app.register_blueprint(financial_aggregation_blueprint)
+app.register_blueprint(analytics_blueprint)
 
 app.register_blueprint(credits_blueprint)
 app.register_blueprint(summaries_blueprint)

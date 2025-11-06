@@ -19,7 +19,7 @@ def init_subscription_blueprint(mongo, token_required, serialize_doc):
     SUBSCRIPTION_PLANS = {
         'monthly': {
             'name': 'Monthly Premium',
-            'price': 2000.0,  # ₦2,000 per month
+            'price': 2500.0,  # ₦2,500 per month
             'duration_days': 30,
             'paystack_plan_code': 'PLN_monthly_premium',
             'description': 'Unlimited operations for 30 days',
@@ -33,17 +33,17 @@ def init_subscription_blueprint(mongo, token_required, serialize_doc):
         },
         'annually': {
             'name': 'Annual Premium',
-            'price': 20000.0,  # ₦20,000 per year (2 months free)
+            'price': 25000.0,  # ₦25,000 per year (2.5 months free)
             'duration_days': 365,
             'paystack_plan_code': 'PLN_annual_premium',
-            'description': 'Unlimited operations for 365 days (Save 2 months!)',
+            'description': 'Unlimited operations for 365 days (Save 2.5 months!)',
             'features': [
                 'Unlimited Income/Expense entries',
                 'Unlimited PDF exports',
                 'All premium features',
                 'Priority support',
                 'No FC costs for any operations',
-                'Save ₦4,000 compared to monthly'
+                'Save ₦5,000 compared to monthly'
             ]
         }
     }
