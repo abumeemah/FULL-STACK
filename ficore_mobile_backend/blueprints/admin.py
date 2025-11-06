@@ -578,11 +578,34 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                     'adjustmentType': 'admin',
                     'operation': operation,
                     'adjustedBy': current_user.get('displayName', 'Admin'),
-                    'reason': reason
+                    'adminId': str(current_user['_id']),
+                    'reason': reason,
+                    'processedAt': datetime.utcnow().isoformat() + 'Z'
                 }
             }
             
             mongo.db.credit_transactions.insert_one(transaction)
+
+            # Create credit event record for audit trail
+            credit_event = {
+                '_id': ObjectId(),
+                'userId': ObjectId(user_id),
+                'transactionId': transaction['_id'],
+                'eventType': 'admin_credit_adjustment',
+                'timestamp': datetime.utcnow(),
+                'adminId': current_user['_id'],
+                'adminName': current_user.get('displayName', 'Admin'),
+                'reason': reason,
+                'metadata': {
+                    'operation': operation,
+                    'amount': amount,
+                    'balanceBefore': current_balance,
+                    'balanceAfter': new_balance,
+                    'adjustedBy': current_user.get('displayName', 'Admin'),
+                    'adjustedAt': datetime.utcnow().isoformat() + 'Z'
+                }
+            }
+            mongo.db.credit_events.insert_one(credit_event)
 
             # Get updated user
             updated_user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
@@ -1787,8 +1810,10 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
 
             # Check if user already has a subscription
             existing_subscription = mongo.db.subscriptions.find_one({'userId': ObjectId(user_id)})
+            subscription_id = None
             
             if existing_subscription:
+                subscription_id = existing_subscription['_id']
                 # Update existing subscription
                 mongo.db.subscriptions.update_one(
                     {'userId': ObjectId(user_id)},
@@ -1807,23 +1832,11 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                         'grantReason': reason
                     }}
                 )
-                
-                # Update user subscription fields to sync with subscription collection
-                mongo.db.users.update_one(
-                    {'_id': ObjectId(user_id)},
-                    {'$set': {
-                        'isSubscribed': True,
-                        'subscriptionType': plan_id,
-                        'subscriptionStartDate': start_date,
-                        'subscriptionEndDate': end_date,
-                        'subscriptionAutoRenew': auto_renew,
-                        'lastUpdated': datetime.utcnow()
-                    }}
-                )
             else:
                 # Create new subscription
+                subscription_id = ObjectId()
                 subscription_data = {
-                    '_id': ObjectId(),
+                    '_id': subscription_id,
                     'userId': ObjectId(user_id),
                     'planId': plan_id,
                     'planName': data.get('planName', plan_id),
@@ -1854,11 +1867,36 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
                 }}
             )
 
+            # Create subscription event record for audit trail
+            subscription_event = {
+                '_id': ObjectId(),
+                'userId': ObjectId(user_id),
+                'subscriptionId': subscription_id,
+                'eventType': 'subscription_granted',
+                'timestamp': datetime.utcnow(),
+                'adminId': current_user['_id'],
+                'adminName': current_user.get('displayName', 'Admin'),
+                'reason': reason,
+                'metadata': {
+                    'planId': plan_id,
+                    'planName': data.get('planName', plan_id),
+                    'durationDays': duration_days,
+                    'amount': amount,
+                    'startDate': start_date.isoformat() + 'Z',
+                    'endDate': end_date.isoformat() + 'Z',
+                    'autoRenew': auto_renew,
+                    'previousSubscription': existing_subscription is not None,
+                    'grantedBy': current_user.get('displayName', 'Admin'),
+                    'grantedAt': datetime.utcnow().isoformat() + 'Z'
+                }
+            }
+            mongo.db.subscription_events.insert_one(subscription_event)
+
             # Create subscription transaction record
             transaction = {
                 '_id': ObjectId(),
                 'userId': ObjectId(user_id),
-                'subscriptionId': existing_subscription['_id'] if existing_subscription else subscription_data['_id'],
+                'subscriptionId': subscription_id,
                 'type': 'subscription_grant',
                 'amount': amount,
                 'description': f'Admin subscription grant: {plan_id} for {duration_days} days - {reason}',
@@ -1874,8 +1912,33 @@ def init_admin_blueprint(mongo, token_required, admin_required, serialize_doc):
             }
             mongo.db.subscription_transactions.insert_one(transaction)
 
+            # Return updated subscription status for immediate frontend update
+            updated_user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+            subscription_status = {
+                'isSubscribed': True,
+                'subscriptionType': plan_id,
+                'planType': plan_id,
+                'startDate': start_date.isoformat() + 'Z',
+                'endDate': end_date.isoformat() + 'Z',
+                'daysRemaining': duration_days,
+                'autoRenew': auto_renew,
+                'isActive': True,
+                'isExpired': False,
+                'isExpiringSoon': duration_days <= 7
+            }
+
             return jsonify({
                 'success': True,
+                'data': {
+                    'subscriptionStatus': subscription_status,
+                    'user': {
+                        'id': str(updated_user['_id']),
+                        'email': updated_user.get('email', ''),
+                        'displayName': updated_user.get('displayName', ''),
+                        'isSubscribed': True,
+                        'subscriptionType': plan_id
+                    }
+                },
                 'message': f'Subscription granted successfully for {duration_days} days'
             })
 
