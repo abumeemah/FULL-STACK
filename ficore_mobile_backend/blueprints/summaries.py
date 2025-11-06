@@ -310,6 +310,7 @@ def init_summaries_blueprint(mongo, token_required, serialize_doc):
                         '$group': {
                             '_id': None,
                             'totalExpenses': {'$sum': '$amount'},
+                            'totalExpenseRecords': {'$sum': 1},
                             'monthlyExpenses': {
                                 '$sum': {
                                     '$cond': [
@@ -320,6 +321,20 @@ def init_summaries_blueprint(mongo, token_required, serialize_doc):
                                             ]
                                         },
                                         '$amount',
+                                        0
+                                    ]
+                                }
+                            },
+                            'monthlyExpenseRecords': {
+                                '$sum': {
+                                    '$cond': [
+                                        {
+                                            '$and': [
+                                                {'$gte': ['$date', start_of_month]},
+                                                {'$lte': ['$date', now]}
+                                            ]
+                                        },
+                                        1,
                                         0
                                     ]
                                 }
@@ -337,6 +352,20 @@ def init_summaries_blueprint(mongo, token_required, serialize_doc):
                                         0
                                     ]
                                 }
+                            },
+                            'yearlyExpenseRecords': {
+                                '$sum': {
+                                    '$cond': [
+                                        {
+                                            '$and': [
+                                                {'$gte': ['$date', start_of_year]},
+                                                {'$lte': ['$date', now]}
+                                            ]
+                                        },
+                                        1,
+                                        0
+                                    ]
+                                }
                             }
                         }
                     }
@@ -347,18 +376,26 @@ def init_summaries_blueprint(mongo, token_required, serialize_doc):
                 if expense_result:
                     result = expense_result[0]
                     summary_data['totalExpenses'] = float(result.get('totalExpenses', 0))
+                    summary_data['totalExpenseRecords'] = int(result.get('totalExpenseRecords', 0))
                     monthly_expenses = float(result.get('monthlyExpenses', 0))
+                    monthly_expense_records = int(result.get('monthlyExpenseRecords', 0))
                     yearly_expenses = float(result.get('yearlyExpenses', 0))
+                    yearly_expense_records = int(result.get('yearlyExpenseRecords', 0))
                     
                     summary_data['monthlyExpenses'] = monthly_expenses
+                    summary_data['monthlyExpenseRecords'] = monthly_expense_records
                     summary_data['monthlyStats']['expenses'] = monthly_expenses
                     summary_data['yearlyExpenses'] = yearly_expenses
+                    summary_data['yearlyExpenseRecords'] = yearly_expense_records
                     summary_data['yearlyStats']['expenses'] = yearly_expenses
                 else:
                     summary_data['totalExpenses'] = 0.0
+                    summary_data['totalExpenseRecords'] = 0
                     summary_data['monthlyExpenses'] = 0.0
+                    summary_data['monthlyExpenseRecords'] = 0
                     summary_data['monthlyStats']['expenses'] = 0.0
                     summary_data['yearlyExpenses'] = 0.0
+                    summary_data['yearlyExpenseRecords'] = 0
                     summary_data['yearlyStats']['expenses'] = 0.0
                 
                 print(f"DEBUG OPTIMIZED SUMMARY - Total Expenses: {summary_data['totalExpenses']}, Monthly: {summary_data['monthlyExpenses']}, Yearly: {summary_data['yearlyExpenses']}")
@@ -367,9 +404,12 @@ def init_summaries_blueprint(mongo, token_required, serialize_doc):
                 print(f"Error fetching expenses: {e}")
                 # Fallback to zero values on error
                 summary_data['totalExpenses'] = 0.0
+                summary_data['totalExpenseRecords'] = 0
                 summary_data['monthlyExpenses'] = 0.0
+                summary_data['monthlyExpenseRecords'] = 0
                 summary_data['monthlyStats']['expenses'] = 0.0
                 summary_data['yearlyExpenses'] = 0.0
+                summary_data['yearlyExpenseRecords'] = 0
                 summary_data['yearlyStats']['expenses'] = 0.0
             
             # Calculate net income
