@@ -538,6 +538,83 @@ def get_analytics(current_user):
             'errors': {'general': [str(e)]}
         }), 500
 
+# Analytics overview endpoint
+@app.route('/analytics/overview', methods=['GET'])
+@token_required
+def get_analytics_overview(current_user):
+    """Get analytics overview - summary of key business metrics"""
+    try:
+        user_id = current_user['_id']
+        
+        # Get current month data
+        now = datetime.utcnow()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        # Get financial data
+        incomes = list(mongo.db.incomes.find({'userId': user_id}))
+        expenses = list(mongo.db.expenses.find({'userId': user_id}))
+        
+        # Current month data
+        current_month_incomes = [inc for inc in incomes if inc['dateReceived'] >= month_start]
+        current_month_expenses = [exp for exp in expenses if exp['date'] >= month_start]
+        
+        current_month_income_total = sum(inc['amount'] for inc in current_month_incomes)
+        current_month_expense_total = sum(exp['amount'] for exp in current_month_expenses)
+        
+        # All time data
+        total_income = sum(inc['amount'] for inc in incomes)
+        total_expenses = sum(exp['amount'] for exp in expenses)
+        
+        # Business suite data (if available)
+        debtors_count = mongo.db.debtors.count_documents({'userId': user_id})
+        creditors_count = mongo.db.creditors.count_documents({'userId': user_id})
+        inventory_count = mongo.db.inventory_items.count_documents({'userId': user_id})
+        
+        # Calculate key metrics
+        net_income = total_income - total_expenses
+        monthly_net = current_month_income_total - current_month_expense_total
+        savings_rate = (net_income / total_income * 100) if total_income > 0 else 0
+        
+        overview_data = {
+            'currentMonth': {
+                'income': current_month_income_total,
+                'expenses': current_month_expense_total,
+                'net': monthly_net,
+                'transactionCount': len(current_month_incomes) + len(current_month_expenses)
+            },
+            'allTime': {
+                'income': total_income,
+                'expenses': total_expenses,
+                'net': net_income,
+                'transactionCount': len(incomes) + len(expenses)
+            },
+            'businessSuite': {
+                'debtorsCount': debtors_count,
+                'creditorsCount': creditors_count,
+                'inventoryCount': inventory_count
+            },
+            'keyMetrics': {
+                'savingsRate': round(savings_rate, 2),
+                'expenseRatio': round((total_expenses / total_income * 100), 2) if total_income > 0 else 0,
+                'averageMonthlyIncome': round(total_income / 12, 2) if total_income > 0 else 0,
+                'averageMonthlyExpense': round(total_expenses / 12, 2) if total_expenses > 0 else 0
+            }
+        }
+        
+        return jsonify({
+            'success': True,
+            'data': overview_data,
+            'message': 'Analytics overview retrieved successfully'
+        }), 200
+        
+    except Exception as e:
+        print(f"Error getting analytics overview: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Failed to retrieve analytics overview',
+            'error': str(e)
+        }), 500
+
 # Error handlers
 @app.errorhandler(404)
 def not_found(error):

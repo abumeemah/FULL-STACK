@@ -113,6 +113,64 @@ def init_creditors_blueprint(mongo, token_required, serialize_doc):
             print(f"Error updating creditor balance: {str(e)}")
             return False
 
+    # ==================== MAIN CREDITORS ENDPOINT ====================
+
+    @creditors_bp.route('/', methods=['GET'])
+    @token_required
+    def get_creditors_overview(current_user):
+        """Get creditors overview - main endpoint for /creditors route"""
+        try:
+            user_id = current_user['_id']
+            
+            # Get summary data
+            vendors = list(mongo.db.creditors.find({'userId': user_id}))
+            total_vendors = len(vendors)
+            
+            # Calculate totals
+            total_owed = sum(vendor.get('totalOwed', 0) for vendor in vendors)
+            total_outstanding = sum(vendor.get('outstandingBalance', 0) for vendor in vendors)
+            
+            # Get overdue vendors
+            overdue_vendors = [v for v in vendors if v.get('isOverdue', False)]
+            overdue_count = len(overdue_vendors)
+            overdue_amount = sum(vendor.get('outstandingBalance', 0) for vendor in overdue_vendors)
+            
+            # Get recent transactions
+            recent_transactions = list(mongo.db.creditor_transactions.find({
+                'userId': user_id
+            }).sort('createdAt', -1).limit(5))
+            
+            # Serialize transactions
+            for transaction in recent_transactions:
+                transaction = serialize_doc(transaction)
+            
+            overview_data = {
+                'totalVendors': total_vendors,
+                'totalOwed': total_owed,
+                'totalOutstanding': total_outstanding,
+                'overdueVendors': overdue_count,
+                'overdueAmount': overdue_amount,
+                'recentTransactions': recent_transactions,
+                'summary': {
+                    'activeVendors': len([v for v in vendors if v.get('status') == 'active']),
+                    'paymentRate': round((total_owed - total_outstanding) / total_owed * 100, 2) if total_owed > 0 else 0
+                }
+            }
+            
+            return jsonify({
+                'success': True,
+                'data': overview_data,
+                'message': 'Creditors overview retrieved successfully'
+            }), 200
+            
+        except Exception as e:
+            print(f"Error getting creditors overview: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve creditors overview',
+                'error': str(e)
+            }), 500
+
     # ==================== VENDOR MANAGEMENT ENDPOINTS ====================
 
     @creditors_bp.route('/vendors', methods=['POST'])

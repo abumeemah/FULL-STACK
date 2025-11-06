@@ -94,6 +94,76 @@ def init_inventory_blueprint(mongo, token_required, serialize_doc):
             print(f"Error creating COGS expense: {str(e)}")
             return False
 
+    # ==================== MAIN INVENTORY ENDPOINT ====================
+
+    @inventory_bp.route('/', methods=['GET'])
+    @token_required
+    def get_inventory_overview(current_user):
+        """Get inventory overview - main endpoint for /inventory route"""
+        try:
+            user_id = current_user['_id']
+            
+            # Get all inventory items
+            items = list(mongo.db.inventory_items.find({'userId': user_id}))
+            
+            # Calculate overview statistics
+            total_items = len(items)
+            total_stock = sum(item.get('currentStock', 0) for item in items)
+            total_value = sum(item.get('currentStock', 0) * item.get('unitPrice', 0) for item in items)
+            
+            # Get low stock items (where current stock <= minimum stock level)
+            low_stock_items = [
+                item for item in items 
+                if item.get('currentStock', 0) <= item.get('minimumStockLevel', 0)
+            ]
+            low_stock_count = len(low_stock_items)
+            
+            # Get out of stock items
+            out_of_stock_items = [item for item in items if item.get('currentStock', 0) == 0]
+            out_of_stock_count = len(out_of_stock_items)
+            
+            # Get active items
+            active_items = [item for item in items if item.get('status') == 'active']
+            active_count = len(active_items)
+            
+            # Get recent movements
+            recent_movements = list(mongo.db.inventory_movements.find({
+                'userId': user_id
+            }).sort('createdAt', -1).limit(5))
+            
+            # Serialize movements
+            for movement in recent_movements:
+                movement = serialize_doc(movement)
+            
+            overview_data = {
+                'totalItems': total_items,
+                'totalStock': total_stock,
+                'totalValue': round(total_value, 2),
+                'activeItems': active_count,
+                'lowStockItems': low_stock_count,
+                'outOfStockItems': out_of_stock_count,
+                'recentMovements': recent_movements,
+                'summary': {
+                    'averageValue': round(total_value / total_items, 2) if total_items > 0 else 0,
+                    'stockTurnover': 'N/A',  # Would need historical data to calculate
+                    'topItems': []  # Could add top items by value or movement
+                }
+            }
+            
+            return jsonify({
+                'success': True,
+                'data': overview_data,
+                'message': 'Inventory overview retrieved successfully'
+            }), 200
+            
+        except Exception as e:
+            print(f"Error getting inventory overview: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve inventory overview',
+                'error': str(e)
+            }), 500
+
     # ==================== ITEM MANAGEMENT ENDPOINTS ====================
 
     @inventory_bp.route('/items', methods=['POST'])
