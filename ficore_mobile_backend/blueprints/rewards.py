@@ -102,6 +102,17 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc, limiter=None):
             'benefit_type': 'unlock_feature',
             'feature_key': 'custom_branding',
             'subscriber_only': True
+        },
+        'subscription_discount_30': {
+            'name': '30% Off Next Subscription',
+            'description': 'Achieve 100 consecutive days of creating entries to unlock this exclusive discount.',
+            'cost': 0.0,  # Not purchased with FCs, earned through milestone
+            'category': 'milestone_reward',
+            'benefit_type': 'subscription_discount',
+            'discount_percentage': 30,
+            'subscriber_only': False,
+            'milestone_type': 'entry_streak',
+            'milestone_target': 100
         }
     }
     
@@ -111,6 +122,9 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc, limiter=None):
             7: {'amount': 10.0, 'flag': 'earned_7day_streak_bonus'},
             30: {'amount': 25.0, 'flag': 'earned_30day_streak_bonus'},
             90: {'amount': 50.0, 'flag': 'earned_90day_streak_bonus'}
+        },
+        'entry_streak_milestones': {
+            100: {'discount_percentage': 30, 'flag': 'earned_100day_entry_streak_discount'}
         },
         'exploration_bonuses': {
             'first_debtors_access': {'amount': 2.0, 'flag': 'earned_first_debtors_access_bonus'},
@@ -193,11 +207,19 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc, limiter=None):
                 print(f"Error getting earning opportunities: {str(e)}")
                 earning_opportunities = []
 
+            # Get entry streak information
+            entry_streak_record = mongo.db.entry_streaks.find_one({'user_id': current_user['_id']})
+            entry_streak = entry_streak_record.get('current_streak', 0) if entry_streak_record else 0
+            
+            # Calculate progress metrics
+            progress_metrics = _calculate_progress_metrics(user, current_streak, entry_streak)
+            
             return jsonify({
                 'success': True,
                 'data': {
                     'fc_balance': float(user.get('ficoreCreditBalance', 0.0)),
                     'streak': current_streak,
+                    'entry_streak': entry_streak,
                     'next_milestone': next_milestone,
                     'last_active_date': rewards_record.get('last_active_date', datetime.utcnow()).isoformat() + 'Z',
                     'active_benefits': active_benefits,
@@ -210,9 +232,12 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc, limiter=None):
                         'earned_first_inventory_access_bonus': user.get('earned_first_inventory_access_bonus', False),
                         'earned_first_advanced_report_bonus': user.get('earned_first_advanced_report_bonus', False),
                         'earned_profile_complete_bonus': user.get('earned_profile_complete_bonus', False),
+                        'earned_100day_entry_streak_discount': user.get('earned_100day_entry_streak_discount', False),
                     },
                     'earning_opportunities': earning_opportunities,
-                    'available_rewards': list(REWARD_CONFIG.keys())
+                    'available_rewards': list(REWARD_CONFIG.keys()),
+                    'progress_metrics': progress_metrics,
+                    'subscription_discounts': user.get('available_subscription_discounts', [])
                 },
                 'message': 'Rewards dashboard retrieved successfully'
             })
@@ -478,6 +503,108 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc, limiter=None):
                 'errors': {'general': [str(e)]}
             }), 500
 
+    @rewards_bp.route('/track-entry', methods=['POST'])
+    @token_required
+    def track_entry_creation(current_user):
+        """Track entry creation for entry streak milestone (100-day discount)"""
+        try:
+            data = request.get_json()
+            
+            # Validate required fields
+            if 'entry_type' not in data:
+                return jsonify({
+                    'success': False,
+                    'message': 'Missing required field: entry_type'
+                }), 400
+
+            entry_type = data['entry_type']  # 'income' or 'expense'
+            
+            # Only track income and expense entries for the streak
+            if entry_type not in ['income', 'expense']:
+                return jsonify({
+                    'success': False,
+                    'message': 'Invalid entry type. Only income and expense entries count towards streak.'
+                }), 400
+            
+            # Get or create entry streak record
+            today = datetime.utcnow().date()
+            entry_streak_record = mongo.db.entry_streaks.find_one({'user_id': current_user['_id']})
+            
+            if not entry_streak_record:
+                entry_streak_record = {
+                    '_id': ObjectId(),
+                    'user_id': current_user['_id'],
+                    'current_streak': 1,
+                    'last_entry_date': today,
+                    'longest_streak': 1,
+                    'created_at': datetime.utcnow(),
+                    'updated_at': datetime.utcnow()
+                }
+                mongo.db.entry_streaks.insert_one(entry_streak_record)
+                current_streak = 1
+            else:
+                last_entry_date = entry_streak_record.get('last_entry_date')
+                current_streak = entry_streak_record.get('current_streak', 0)
+                
+                if last_entry_date:
+                    if isinstance(last_entry_date, datetime):
+                        last_entry_date = last_entry_date.date()
+                    
+                    yesterday = today - timedelta(days=1)
+                    
+                    if last_entry_date == today:
+                        # Already created entry today, no streak change
+                        pass
+                    elif last_entry_date == yesterday:
+                        # Continue streak - entry created yesterday and today
+                        current_streak += 1
+                    else:
+                        # Gap in entries, reset streak to 1 (today's entry)
+                        current_streak = 1
+                else:
+                    # First time entry
+                    current_streak = 1
+                
+                # Update entry streak record
+                longest_streak = max(entry_streak_record.get('longest_streak', 0), current_streak)
+                mongo.db.entry_streaks.update_one(
+                    {'_id': entry_streak_record['_id']},
+                    {
+                        '$set': {
+                            'current_streak': current_streak,
+                            'last_entry_date': today,
+                            'longest_streak': longest_streak,
+                            'updated_at': datetime.utcnow()
+                        }
+                    }
+                )
+
+            # Check for entry streak milestones (100-day discount)
+            user = mongo.db.users.find_one({'_id': current_user['_id']})
+            _check_and_award_entry_streak_milestones(mongo, current_user, current_streak, user)
+
+            return jsonify({
+                'success': True,
+                'data': {
+                    'entry_streak': current_streak,
+                    'milestone_progress': {
+                        'current': current_streak,
+                        'target': 100,
+                        'progress_percentage': min(100, (current_streak / 100) * 100),
+                        'completed': current_streak >= 100
+                    }
+                },
+                'message': 'Entry creation tracked successfully'
+            })
+
+        except Exception as e:
+            print(f"Error in track_entry_creation: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to track entry creation',
+                'errors': {'general': [str(e)]}
+            }), 500
+
     @rewards_bp.route('/available', methods=['GET'])
     @token_required
     def get_available_rewards(current_user):
@@ -739,6 +866,50 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc, limiter=None):
         except Exception as e:
             print(f"Error awarding exploration bonuses: {str(e)}")
 
+    def _check_and_award_entry_streak_milestones(mongo, current_user, entry_streak, user):
+        """Check and award entry streak milestones (100-day subscription discount)"""
+        try:
+            for milestone, config in EARNING_CONFIG['entry_streak_milestones'].items():
+                if entry_streak >= milestone and not user.get(config['flag'], False):
+                    # Award subscription discount
+                    discount_percentage = config['discount_percentage']
+                    expiry_date = datetime.utcnow() + timedelta(days=365)  # 1 year to use
+                    
+                    # Create discount record
+                    discount_record = {
+                        '_id': ObjectId(),
+                        'user_id': current_user['_id'],
+                        'discount_type': 'subscription',
+                        'discount_percentage': discount_percentage,
+                        'created_at': datetime.utcnow(),
+                        'expires_at': expiry_date,
+                        'used': False,
+                        'milestone_achievement': True,
+                        'milestone_type': 'entry_streak',
+                        'milestone_value': milestone,
+                        'description': f'{milestone}-day entry streak achievement'
+                    }
+                    mongo.db.subscription_discounts.insert_one(discount_record)
+                    
+                    # Update user flag and add discount ID
+                    user_updates = {
+                        config['flag']: True
+                    }
+                    
+                    # Add discount ID to user record
+                    current_discounts = user.get('available_subscription_discounts', [])
+                    current_discounts.append(str(discount_record['_id']))
+                    user_updates['available_subscription_discounts'] = current_discounts
+                    
+                    mongo.db.users.update_one(
+                        {'_id': current_user['_id']},
+                        {'$set': user_updates}
+                    )
+                    
+                    print(f"Awarded {discount_percentage}% subscription discount for {milestone}-day entry streak milestone")
+        except Exception as e:
+            print(f"Error awarding entry streak milestones: {str(e)}")
+
     def _get_active_benefits(user):
         """Get user's currently active benefits"""
         active_benefits = {}
@@ -889,6 +1060,29 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc, limiter=None):
                 user = mongo.db.users.find_one({'_id': user_id})
                 current_limit = user.get(limit_key, 0)
                 update_data[limit_key] = current_limit + limit_amount
+            elif benefit_type == 'subscription_discount':
+                # Create subscription discount coupon
+                discount_percentage = reward_config['discount_percentage']
+                expiry_date = datetime.utcnow() + timedelta(days=90)  # 90 days to use
+                
+                # Create discount record
+                discount_record = {
+                    '_id': ObjectId(),
+                    'user_id': user_id,
+                    'discount_type': 'subscription',
+                    'discount_percentage': discount_percentage,
+                    'created_at': datetime.utcnow(),
+                    'expires_at': expiry_date,
+                    'used': False,
+                    'reward_redemption': True
+                }
+                mongo.db.subscription_discounts.insert_one(discount_record)
+                
+                # Add discount ID to user record
+                user = mongo.db.users.find_one({'_id': user_id})
+                current_discounts = user.get('available_subscription_discounts', [])
+                current_discounts.append(str(discount_record['_id']))
+                update_data['available_subscription_discounts'] = current_discounts
             
             if update_data:
                 result = mongo.db.users.update_one(
@@ -922,6 +1116,78 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc, limiter=None):
             return f"Increased {reward_config['limit_key']} by {reward_config['limit_amount']}"
         
         return "Benefit applied successfully"
+
+    def _calculate_progress_metrics(user, current_streak, entry_streak=0):
+        """Calculate detailed progress metrics for user"""
+        try:
+            metrics = {
+                'streak_progress': {
+                    'current': current_streak,
+                    'next_milestone': 7 if current_streak < 7 else (30 if current_streak < 30 else (90 if current_streak < 90 else None)),
+                    'progress_percentage': min(100, (current_streak / 7) * 100) if current_streak < 7 else 
+                                         min(100, (current_streak / 30) * 100) if current_streak < 30 else
+                                         min(100, (current_streak / 90) * 100) if current_streak < 90 else 100,
+                    'completed': current_streak >= 90
+                },
+                'entry_streak_progress': {
+                    'current': entry_streak,
+                    'target': 100,
+                    'progress_percentage': min(100, (entry_streak / 100) * 100),
+                    'completed': entry_streak >= 100,
+                    'reward': '30% Off Next Subscription',
+                    'description': 'Create at least one income or expense entry daily for 100 consecutive days'
+                },
+                'exploration_progress': []
+            }
+            
+            # Add exploration progress
+            exploration_items = [
+                {
+                    'id': 'debtors_access',
+                    'title': 'First Debtors Access',
+                    'description': 'Access the Debtors module',
+                    'reward': '2 FC',
+                    'completed': user.get('earned_first_debtors_access_bonus', False)
+                },
+                {
+                    'id': 'creditors_access', 
+                    'title': 'First Creditors Access',
+                    'description': 'Access the Creditors module',
+                    'reward': '2 FC',
+                    'completed': user.get('earned_first_creditors_access_bonus', False)
+                },
+                {
+                    'id': 'inventory_access',
+                    'title': 'First Inventory Access', 
+                    'description': 'Access the Inventory module',
+                    'reward': '2 FC',
+                    'completed': user.get('earned_first_inventory_access_bonus', False)
+                },
+                {
+                    'id': 'advanced_report',
+                    'title': 'First Advanced Report',
+                    'description': 'Generate your first advanced report',
+                    'reward': '5 FC',
+                    'completed': user.get('earned_first_advanced_report_bonus', False)
+                },
+                {
+                    'id': 'profile_complete',
+                    'title': 'Complete Profile',
+                    'description': 'Complete your business profile',
+                    'reward': '10 FC',
+                    'completed': user.get('earned_profile_complete_bonus', False)
+                }
+            ]
+            
+            metrics['exploration_progress'] = exploration_items
+            return metrics
+            
+        except Exception as e:
+            print(f"Error calculating progress metrics: {str(e)}")
+            return {
+                'streak_progress': {'current': current_streak, 'next_milestone': 7, 'progress_percentage': 0, 'completed': False},
+                'exploration_progress': []
+            }
 
     def _ensure_activity_tracking_indexes(mongo):
         """Ensure proper indexes exist for activity tracking collection"""

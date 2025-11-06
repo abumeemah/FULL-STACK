@@ -27,6 +27,7 @@ from blueprints.inventory import init_inventory_blueprint
 from blueprints.dashboard import init_dashboard_blueprint
 from blueprints.rewards import init_rewards_blueprint
 from blueprints.subscription import init_subscription_blueprint
+from blueprints.subscription_discounts import init_subscription_discounts_blueprint
 from blueprints.reminders import init_reminders_blueprint
 
 # Import database models
@@ -249,6 +250,7 @@ inventory_blueprint = init_inventory_blueprint(mongo, token_required, serialize_
 dashboard_blueprint = init_dashboard_blueprint(mongo, token_required, serialize_doc)
 rewards_blueprint = init_rewards_blueprint(mongo, token_required, serialize_doc)
 subscription_blueprint = init_subscription_blueprint(mongo, token_required, serialize_doc)
+subscription_discounts_blueprint = init_subscription_discounts_blueprint(mongo, token_required, serialize_doc)
 reminders_blueprint = init_reminders_blueprint(mongo, token_required, serialize_doc)
 
 app.register_blueprint(auth_blueprint)
@@ -267,6 +269,7 @@ app.register_blueprint(inventory_blueprint)
 app.register_blueprint(dashboard_blueprint)
 app.register_blueprint(rewards_blueprint)
 app.register_blueprint(subscription_blueprint)
+app.register_blueprint(subscription_discounts_blueprint)
 app.register_blueprint(reminders_blueprint)
 
 # Health check endpoint
