@@ -321,6 +321,7 @@ def init_financial_aggregation_blueprint(mongo, token_required, serialize_doc):
         def get_all_time_record_counts(self, user_id: ObjectId) -> Dict[str, Any]:
             """
             Get all-time transaction counts by category.
+            CRITICAL FIX: Ensures amount field is properly converted to numeric type before aggregation.
             
             Args:
                 user_id: User's ObjectId
@@ -328,34 +329,82 @@ def init_financial_aggregation_blueprint(mongo, token_required, serialize_doc):
             Returns:
                 Dict containing all-time counts by category
             """
-            # All-time Income counts by category
+            # All-time Income counts by category with numeric amount conversion
             income_pipeline = [
                 {
                     '$match': {
-                        'userId': user_id
+                        'userId': user_id,
+                        'amount': {'$exists': True, '$ne': None}
+                    }
+                },
+                # CRITICAL FIX: Convert amount to numeric type
+                {
+                    '$addFields': {
+                        'numericAmount': {
+                            '$cond': {
+                                'if': {'$type': '$amount'},
+                                'then': {
+                                    '$cond': {
+                                        'if': {'$eq': [{'$type': '$amount'}, 'string']},
+                                        'then': {'$toDouble': '$amount'},
+                                        'else': '$amount'
+                                    }
+                                },
+                                'else': 0
+                            }
+                        }
+                    }
+                },
+                {
+                    '$match': {
+                        'numericAmount': {'$gt': 0}
                     }
                 },
                 {
                     '$group': {
                         '_id': '$category',
                         'count': {'$sum': 1},
-                        'totalAmount': {'$sum': '$amount'}
+                        'totalAmount': {'$sum': '$numericAmount'}  # Use converted numeric amount
                     }
                 }
             ]
             
-            # All-time Expense counts by category
+            # All-time Expense counts by category with numeric amount conversion
             expense_pipeline = [
                 {
                     '$match': {
-                        'userId': user_id
+                        'userId': user_id,
+                        'amount': {'$exists': True, '$ne': None}
+                    }
+                },
+                # CRITICAL FIX: Convert amount to numeric type
+                {
+                    '$addFields': {
+                        'numericAmount': {
+                            '$cond': {
+                                'if': {'$type': '$amount'},
+                                'then': {
+                                    '$cond': {
+                                        'if': {'$eq': [{'$type': '$amount'}, 'string']},
+                                        'then': {'$toDouble': '$amount'},
+                                        'else': '$amount'
+                                    }
+                                },
+                                'else': 0
+                            }
+                        }
+                    }
+                },
+                {
+                    '$match': {
+                        'numericAmount': {'$gt': 0}
                     }
                 },
                 {
                     '$group': {
                         '_id': '$category',
                         'count': {'$sum': 1},
-                        'totalAmount': {'$sum': '$amount'}
+                        'totalAmount': {'$sum': '$numericAmount'}  # Use converted numeric amount
                     }
                 }
             ]
@@ -450,13 +499,37 @@ def init_financial_aggregation_blueprint(mongo, token_required, serialize_doc):
                             'dateReceived': {
                                 '$gte': start_of_month,
                                 '$lte': end_of_month
+                            },
+                            'amount': {'$exists': True, '$ne': None}
+                        }
+                    },
+                    # CRITICAL FIX: Convert amount to numeric type
+                    {
+                        '$addFields': {
+                            'numericAmount': {
+                                '$cond': {
+                                    'if': {'$type': '$amount'},
+                                    'then': {
+                                        '$cond': {
+                                            'if': {'$eq': [{'$type': '$amount'}, 'string']},
+                                            'then': {'$toDouble': '$amount'},
+                                            'else': '$amount'
+                                        }
+                                    },
+                                    'else': 0
+                                }
                             }
+                        }
+                    },
+                    {
+                        '$match': {
+                            'numericAmount': {'$gt': 0}
                         }
                     },
                     {
                         '$group': {
                             '_id': None,
-                            'totalIncome': {'$sum': '$amount'},
+                            'totalIncome': {'$sum': '$numericAmount'},  # Use converted numeric amount
                             'count': {'$sum': 1}
                         }
                     }
@@ -469,13 +542,37 @@ def init_financial_aggregation_blueprint(mongo, token_required, serialize_doc):
                             'date': {
                                 '$gte': start_of_month,
                                 '$lte': end_of_month
+                            },
+                            'amount': {'$exists': True, '$ne': None}
+                        }
+                    },
+                    # CRITICAL FIX: Convert amount to numeric type
+                    {
+                        '$addFields': {
+                            'numericAmount': {
+                                '$cond': {
+                                    'if': {'$type': '$amount'},
+                                    'then': {
+                                        '$cond': {
+                                            'if': {'$eq': [{'$type': '$amount'}, 'string']},
+                                            'then': {'$toDouble': '$amount'},
+                                            'else': '$amount'
+                                        }
+                                    },
+                                    'else': 0
+                                }
                             }
+                        }
+                    },
+                    {
+                        '$match': {
+                            'numericAmount': {'$gt': 0}
                         }
                     },
                     {
                         '$group': {
                             '_id': None,
-                            'totalExpenses': {'$sum': '$amount'},
+                            'totalExpenses': {'$sum': '$numericAmount'},  # Use converted numeric amount
                             'count': {'$sum': 1}
                         }
                     }
@@ -545,7 +642,7 @@ def init_financial_aggregation_blueprint(mongo, token_required, serialize_doc):
                 end_of_year = datetime(year + 1, 1, 1) - timedelta(seconds=1)
                 user_id = current_user['_id']
                 
-                # YTD Income counts by category for specific year
+                # YTD Income counts by category for specific year with numeric conversion
                 income_pipeline = [
                     {
                         '$match': {
@@ -553,19 +650,43 @@ def init_financial_aggregation_blueprint(mongo, token_required, serialize_doc):
                             'dateReceived': {
                                 '$gte': start_of_year,
                                 '$lte': end_of_year
+                            },
+                            'amount': {'$exists': True, '$ne': None}
+                        }
+                    },
+                    # CRITICAL FIX: Convert amount to numeric type
+                    {
+                        '$addFields': {
+                            'numericAmount': {
+                                '$cond': {
+                                    'if': {'$type': '$amount'},
+                                    'then': {
+                                        '$cond': {
+                                            'if': {'$eq': [{'$type': '$amount'}, 'string']},
+                                            'then': {'$toDouble': '$amount'},
+                                            'else': '$amount'
+                                        }
+                                    },
+                                    'else': 0
+                                }
                             }
+                        }
+                    },
+                    {
+                        '$match': {
+                            'numericAmount': {'$gt': 0}
                         }
                     },
                     {
                         '$group': {
                             '_id': '$category',
                             'count': {'$sum': 1},
-                            'totalAmount': {'$sum': '$amount'}
+                            'totalAmount': {'$sum': '$numericAmount'}  # Use converted numeric amount
                         }
                     }
                 ]
                 
-                # YTD Expense counts by category for specific year
+                # YTD Expense counts by category for specific year with numeric conversion
                 expense_pipeline = [
                     {
                         '$match': {
@@ -573,14 +694,38 @@ def init_financial_aggregation_blueprint(mongo, token_required, serialize_doc):
                             'date': {
                                 '$gte': start_of_year,
                                 '$lte': end_of_year
+                            },
+                            'amount': {'$exists': True, '$ne': None}
+                        }
+                    },
+                    # CRITICAL FIX: Convert amount to numeric type
+                    {
+                        '$addFields': {
+                            'numericAmount': {
+                                '$cond': {
+                                    'if': {'$type': '$amount'},
+                                    'then': {
+                                        '$cond': {
+                                            'if': {'$eq': [{'$type': '$amount'}, 'string']},
+                                            'then': {'$toDouble': '$amount'},
+                                            'else': '$amount'
+                                        }
+                                    },
+                                    'else': 0
+                                }
                             }
+                        }
+                    },
+                    {
+                        '$match': {
+                            'numericAmount': {'$gt': 0}
                         }
                     },
                     {
                         '$group': {
                             '_id': '$category',
                             'count': {'$sum': 1},
-                            'totalAmount': {'$sum': '$amount'}
+                            'totalAmount': {'$sum': '$numericAmount'}  # Use converted numeric amount
                         }
                     }
                 ]

@@ -181,6 +181,7 @@ class DatabaseOptimizer:
         """
         Get optimized aggregation pipeline for monthly totals.
         Uses compound indexes and efficient query patterns with enhanced performance.
+        CRITICAL FIX: Ensures amount field is properly converted to numeric type before aggregation.
         
         Args:
             user_id: User's ObjectId
@@ -203,18 +204,42 @@ class DatabaseOptimizer:
                         '$gte': start_date,
                         '$lte': end_date
                     },
-                    'amount': {'$gt': 0}  # Ensure positive amounts only
+                    'amount': {'$exists': True, '$ne': None}  # Ensure amount field exists and is not null
                 }
             },
-            # Efficient grouping with enhanced aggregation operations
+            # CRITICAL FIX: Add fields stage to ensure amount is numeric
+            {
+                '$addFields': {
+                    'numericAmount': {
+                        '$cond': {
+                            'if': {'$type': '$amount'},
+                            'then': {
+                                '$cond': {
+                                    'if': {'$eq': [{'$type': '$amount'}, 'string']},
+                                    'then': {'$toDouble': '$amount'},
+                                    'else': '$amount'
+                                }
+                            },
+                            'else': 0
+                        }
+                    }
+                }
+            },
+            # Filter out zero or negative amounts after conversion
+            {
+                '$match': {
+                    'numericAmount': {'$gt': 0}
+                }
+            },
+            # Efficient grouping with enhanced aggregation operations using numericAmount
             {
                 '$group': {
                     '_id': None,
-                    'totalAmount': {'$sum': '$amount'},
+                    'totalAmount': {'$sum': '$numericAmount'},  # Use converted numeric amount
                     'count': {'$sum': 1},
-                    'avgAmount': {'$avg': '$amount'},
-                    'maxAmount': {'$max': '$amount'},
-                    'minAmount': {'$min': '$amount'}
+                    'avgAmount': {'$avg': '$numericAmount'},   # Use converted numeric amount
+                    'maxAmount': {'$max': '$numericAmount'},   # Use converted numeric amount
+                    'minAmount': {'$min': '$numericAmount'}    # Use converted numeric amount
                 }
             },
             # Project final result with computed fields
@@ -238,6 +263,7 @@ class DatabaseOptimizer:
         """
         Get optimized aggregation pipeline for year-to-date calculations.
         Enhanced with better index utilization and performance optimizations.
+        CRITICAL FIX: Ensures amount field is properly converted to numeric type before aggregation.
         
         Args:
             user_id: User's ObjectId
@@ -256,16 +282,40 @@ class DatabaseOptimizer:
                 '$match': {
                     'userId': user_id,
                     date_field: {'$gte': start_of_year},
-                    'amount': {'$gt': 0}  # Ensure positive amounts only
+                    'amount': {'$exists': True, '$ne': None}  # Ensure amount field exists and is not null
                 }
             },
-            # Enhanced grouping by category with additional metrics
+            # CRITICAL FIX: Add fields stage to ensure amount is numeric
+            {
+                '$addFields': {
+                    'numericAmount': {
+                        '$cond': {
+                            'if': {'$type': '$amount'},
+                            'then': {
+                                '$cond': {
+                                    'if': {'$eq': [{'$type': '$amount'}, 'string']},
+                                    'then': {'$toDouble': '$amount'},
+                                    'else': '$amount'
+                                }
+                            },
+                            'else': 0
+                        }
+                    }
+                }
+            },
+            # Filter out zero or negative amounts after conversion
+            {
+                '$match': {
+                    'numericAmount': {'$gt': 0}
+                }
+            },
+            # Enhanced grouping by category with additional metrics using numericAmount
             {
                 '$group': {
                     '_id': '$category',
                     'count': {'$sum': 1},
-                    'totalAmount': {'$sum': '$amount'},
-                    'avgAmount': {'$avg': '$amount'},
+                    'totalAmount': {'$sum': '$numericAmount'},  # Use converted numeric amount
+                    'avgAmount': {'$avg': '$numericAmount'},   # Use converted numeric amount
                     'firstTransaction': {'$min': f'${date_field}'},
                     'lastTransaction': {'$max': f'${date_field}'}
                 }
