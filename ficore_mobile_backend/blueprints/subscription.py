@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timedelta
 from bson import ObjectId
 import os
 import requests
@@ -130,18 +130,39 @@ def init_subscription_blueprint(mongo, token_required, serialize_doc):
         try:
             data = request.get_json()
             
+            # Log incoming request for debugging
+            print(f"[SUBSCRIPTION INIT] User: {current_user.get('email', 'unknown')}")
+            print(f"[SUBSCRIPTION INIT] Request data: {data}")
+            
             # Validate required fields
-            if 'plan_type' not in data:
+            if not data:
+                error_msg = 'No JSON data provided in request body'
+                print(f"[SUBSCRIPTION INIT ERROR] {error_msg}")
                 return jsonify({
                     'success': False,
-                    'message': 'Missing required field: plan_type'
+                    'message': error_msg,
+                    'errors': {'request': [error_msg]}
+                }), 400
+            
+            if 'plan_type' not in data:
+                error_msg = 'Missing required field: plan_type'
+                print(f"[SUBSCRIPTION INIT ERROR] {error_msg}")
+                print(f"[SUBSCRIPTION INIT ERROR] Available keys: {list(data.keys())}")
+                return jsonify({
+                    'success': False,
+                    'message': error_msg,
+                    'errors': {'plan_type': [error_msg]}
                 }), 400
             
             plan_type = data['plan_type']
             if plan_type not in SUBSCRIPTION_PLANS:
+                error_msg = f'Invalid subscription plan: {plan_type}'
+                print(f"[SUBSCRIPTION INIT ERROR] {error_msg}")
+                print(f"[SUBSCRIPTION INIT ERROR] Valid plans: {list(SUBSCRIPTION_PLANS.keys())}")
                 return jsonify({
                     'success': False,
-                    'message': 'Invalid subscription plan'
+                    'message': error_msg,
+                    'errors': {'plan_type': [f'Must be one of: {", ".join(SUBSCRIPTION_PLANS.keys())}']}
                 }), 400
             
             plan = SUBSCRIPTION_PLANS[plan_type]
@@ -151,9 +172,12 @@ def init_subscription_blueprint(mongo, token_required, serialize_doc):
             if user.get('isSubscribed', False):
                 end_date = user.get('subscriptionEndDate')
                 if end_date and end_date > datetime.utcnow():
+                    error_msg = 'You already have an active subscription'
+                    print(f"[SUBSCRIPTION INIT ERROR] {error_msg} - End date: {end_date}")
                     return jsonify({
                         'success': False,
-                        'message': 'You already have an active subscription'
+                        'message': error_msg,
+                        'errors': {'subscription': [f'Active until {end_date.isoformat()}']}
                     }), 400
             
             # Initialize Paystack transaction
@@ -170,7 +194,9 @@ def init_subscription_blueprint(mongo, token_required, serialize_doc):
                 }
             }
             
+            print(f"[SUBSCRIPTION INIT] Calling Paystack with data: {paystack_data}")
             paystack_response = _make_paystack_request('/transaction/initialize', 'POST', paystack_data)
+            print(f"[SUBSCRIPTION INIT] Paystack response: {paystack_response}")
             
             if paystack_response.get('status'):
                 # Store pending subscription
@@ -186,6 +212,7 @@ def init_subscription_blueprint(mongo, token_required, serialize_doc):
                 }
                 
                 mongo.db.pending_subscriptions.insert_one(pending_subscription)
+                print(f"[SUBSCRIPTION INIT] Success - Reference: {paystack_data['reference']}")
                 
                 return jsonify({
                     'success': True,
@@ -197,16 +224,26 @@ def init_subscription_blueprint(mongo, token_required, serialize_doc):
                     'message': 'Payment initialized successfully'
                 })
             else:
+                error_msg = paystack_response.get('message', 'Failed to initialize payment')
+                print(f"[SUBSCRIPTION INIT ERROR] Paystack failed: {error_msg}")
+                print(f"[SUBSCRIPTION INIT ERROR] Full response: {paystack_response}")
                 return jsonify({
                     'success': False,
-                    'message': paystack_response.get('message', 'Failed to initialize payment')
+                    'message': error_msg,
+                    'errors': {'paystack': [error_msg]}
                 }), 400
 
         except Exception as e:
+            error_trace = traceback.format_exc()
+            print(f"[SUBSCRIPTION INIT EXCEPTION] {str(e)}")
+            print(f"[SUBSCRIPTION INIT EXCEPTION] Traceback:\n{error_trace}")
             return jsonify({
                 'success': False,
                 'message': 'Failed to initialize subscription',
-                'errors': {'general': [str(e)]}
+                'errors': {
+                    'general': [str(e)],
+                    'type': type(e).__name__
+                }
             }), 500
 
     @subscription_bp.route('/verify/<reference>', methods=['GET'])
@@ -324,9 +361,12 @@ def init_subscription_blueprint(mongo, token_required, serialize_doc):
             auto_renew = user.get('subscriptionAutoRenew', False)
             
             # Check if subscription is actually active
+            # IMPORTANT: Do not auto-revert admin grants - only revert if significantly expired (24+ hours)
             if is_subscribed and end_date:
-                if end_date <= datetime.utcnow():
-                    # Subscription expired, update status
+                # Add 24-hour grace period to prevent immediate reversion of admin grants
+                grace_period_end = end_date + timedelta(hours=24)
+                if grace_period_end <= datetime.utcnow():
+                    # Subscription expired beyond grace period, update status
                     mongo.db.users.update_one(
                         {'_id': current_user['_id']},
                         {'$set': {'isSubscribed': False}}
