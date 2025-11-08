@@ -527,7 +527,10 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc, limiter=None):
                 }), 400
             
             # Get or create entry streak record
-            today = datetime.utcnow().date()
+            now = datetime.utcnow()
+            today = now.date()
+            today_datetime = datetime.combine(today, datetime.min.time())
+            
             entry_streak_record = mongo.db.entry_streaks.find_one({'user_id': current_user['_id']})
             
             if not entry_streak_record:
@@ -535,10 +538,10 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc, limiter=None):
                     '_id': ObjectId(),
                     'user_id': current_user['_id'],
                     'current_streak': 1,
-                    'last_entry_date': today,
+                    'last_entry_date': today_datetime,
                     'longest_streak': 1,
-                    'created_at': datetime.utcnow(),
-                    'updated_at': datetime.utcnow()
+                    'created_at': now,
+                    'updated_at': now
                 }
                 mongo.db.entry_streaks.insert_one(entry_streak_record)
                 current_streak = 1
@@ -572,9 +575,9 @@ def init_rewards_blueprint(mongo, token_required, serialize_doc, limiter=None):
                     {
                         '$set': {
                             'current_streak': current_streak,
-                            'last_entry_date': today,
+                            'last_entry_date': today_datetime,
                             'longest_streak': longest_streak,
-                            'updated_at': datetime.utcnow()
+                            'updated_at': now
                         }
                     }
                 )
