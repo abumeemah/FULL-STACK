@@ -181,12 +181,13 @@ def init_subscription_blueprint(mongo, token_required, serialize_doc):
                     }), 400
             
             # Initialize Paystack transaction
+            reference = f"sub_{current_user['_id']}_{plan_type}_{int(datetime.utcnow().timestamp())}"
             paystack_data = {
                 'email': user['email'],
                 'amount': int(plan['price'] * 100),  # Paystack expects kobo
                 'currency': 'NGN',
-                'reference': f"sub_{current_user['_id']}_{plan_type}_{int(datetime.utcnow().timestamp())}",
-                'callback_url': f"{request.host_url}subscription/verify",
+                'reference': reference,
+                'callback_url': f"{request.host_url.rstrip('/')}subscription/verify-callback?reference={reference}",
                 'metadata': {
                     'user_id': str(current_user['_id']),
                     'plan_type': plan_type,
@@ -246,11 +247,123 @@ def init_subscription_blueprint(mongo, token_required, serialize_doc):
                 }
             }), 500
 
+    @subscription_bp.route('/verify-callback', methods=['GET'])
+    def verify_subscription_callback():
+        """Handle Paystack redirect callback (no auth required)"""
+        try:
+            from flask import redirect, render_template
+            
+            reference = request.args.get('reference')
+            
+            if not reference:
+                # Return HTML page with error
+                return render_template('payment_callback.html', 
+                                     status='failed', 
+                                     error='missing_reference'), 400
+            
+            print(f"[SUBSCRIPTION CALLBACK] Received callback for reference: {reference}")
+            
+            # Verify with Paystack
+            paystack_response = _make_paystack_request(f'/transaction/verify/{reference}')
+            
+            if not paystack_response.get('status'):
+                print(f"[SUBSCRIPTION CALLBACK] Paystack verification failed: {paystack_response}")
+                return render_template('payment_callback.html',
+                                     status='failed',
+                                     reference=reference,
+                                     error='verification_failed'), 400
+            
+            transaction_data = paystack_response['data']
+            
+            # Check if payment was successful
+            if transaction_data['status'] != 'success':
+                print(f"[SUBSCRIPTION CALLBACK] Payment status: {transaction_data['status']}")
+                return render_template('payment_callback.html',
+                                     status='failed',
+                                     reference=reference,
+                                     error=transaction_data['status']), 400
+            
+            # Find pending subscription
+            pending_sub = mongo.db.pending_subscriptions.find_one({'reference': reference})
+            
+            if not pending_sub:
+                print(f"[SUBSCRIPTION CALLBACK] Pending subscription not found for reference: {reference}")
+                return render_template('payment_callback.html',
+                                     status='failed',
+                                     reference=reference,
+                                     error='not_found'), 404
+            
+            user_id = pending_sub['userId']
+            plan_type = pending_sub['planType']
+            plan = SUBSCRIPTION_PLANS[plan_type]
+            
+            # Activate subscription
+            start_date = datetime.utcnow()
+            end_date = start_date + timedelta(days=plan['duration_days'])
+            
+            # Update user subscription
+            mongo.db.users.update_one(
+                {'_id': user_id},
+                {
+                    '$set': {
+                        'isSubscribed': True,
+                        'subscriptionType': plan_type,
+                        'subscriptionStartDate': start_date,
+                        'subscriptionEndDate': end_date,
+                        'subscriptionAutoRenew': True,
+                        'paymentMethodDetails': {
+                            'last4': transaction_data.get('authorization', {}).get('last4', ''),
+                            'brand': transaction_data.get('authorization', {}).get('brand', ''),
+                            'authorization_code': transaction_data.get('authorization', {}).get('authorization_code', '')
+                        }
+                    }
+                }
+            )
+            
+            # Create subscription record
+            subscription_record = {
+                '_id': ObjectId(),
+                'userId': user_id,
+                'planType': plan_type,
+                'amount': plan['price'],
+                'startDate': start_date,
+                'endDate': end_date,
+                'status': 'active',
+                'paymentReference': reference,
+                'paystackTransactionId': transaction_data['id'],
+                'createdAt': datetime.utcnow()
+            }
+            
+            mongo.db.subscriptions.insert_one(subscription_record)
+            
+            # Update pending subscription status
+            mongo.db.pending_subscriptions.update_one(
+                {'_id': pending_sub['_id']},
+                {'$set': {'status': 'completed', 'completedAt': datetime.utcnow()}}
+            )
+            
+            print(f"[SUBSCRIPTION CALLBACK] Subscription activated successfully for user: {user_id}")
+            
+            # Return HTML page with success (includes deep link redirect)
+            return render_template('payment_callback.html',
+                                 status='success',
+                                 reference=reference,
+                                 plan=plan_type)
+
+        except Exception as e:
+            print(f"[SUBSCRIPTION CALLBACK ERROR] {str(e)}")
+            print(f"[SUBSCRIPTION CALLBACK ERROR] Traceback:\n{traceback.format_exc()}")
+            return render_template('payment_callback.html',
+                                 status='failed',
+                                 error='server_error'), 500
+
     @subscription_bp.route('/verify/<reference>', methods=['GET'])
     @token_required
     def verify_subscription_payment(current_user, reference):
-        """Verify subscription payment with Paystack"""
+        """Verify subscription payment with Paystack (authenticated endpoint for manual verification)"""
         try:
+            print(f"[SUBSCRIPTION VERIFY] User {current_user.get('email')} verifying reference: {reference}")
+            
             # Verify with Paystack
             paystack_response = _make_paystack_request(f'/transaction/verify/{reference}')
             
@@ -283,6 +396,21 @@ def init_subscription_blueprint(mongo, token_required, serialize_doc):
             
             plan_type = pending_sub['planType']
             plan = SUBSCRIPTION_PLANS[plan_type]
+            
+            # Check if already activated
+            if pending_sub.get('status') == 'completed':
+                # Return existing subscription details
+                user = mongo.db.users.find_one({'_id': current_user['_id']})
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'subscription_type': user.get('subscriptionType'),
+                        'start_date': user.get('subscriptionStartDate').isoformat() + 'Z' if user.get('subscriptionStartDate') else None,
+                        'end_date': user.get('subscriptionEndDate').isoformat() + 'Z' if user.get('subscriptionEndDate') else None,
+                        'plan_name': plan['name']
+                    },
+                    'message': 'Subscription already activated'
+                })
             
             # Activate subscription
             start_date = datetime.utcnow()
@@ -329,6 +457,8 @@ def init_subscription_blueprint(mongo, token_required, serialize_doc):
                 {'$set': {'status': 'completed', 'completedAt': datetime.utcnow()}}
             )
             
+            print(f"[SUBSCRIPTION VERIFY] Subscription activated successfully")
+            
             return jsonify({
                 'success': True,
                 'data': {
@@ -341,6 +471,8 @@ def init_subscription_blueprint(mongo, token_required, serialize_doc):
             })
 
         except Exception as e:
+            print(f"[SUBSCRIPTION VERIFY ERROR] {str(e)}")
+            print(f"[SUBSCRIPTION VERIFY ERROR] Traceback:\n{traceback.format_exc()}")
             return jsonify({
                 'success': False,
                 'message': 'Failed to verify subscription payment',
